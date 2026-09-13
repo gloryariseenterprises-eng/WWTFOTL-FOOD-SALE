@@ -88,21 +88,26 @@
             </div>
 
             <form id="order-form" class="space-y-3.5" onsubmit="submitOrder(event)">
-              <div>
-                <label class="block text-sm font-medium text-stone-700 mb-1">Full Name *</label>
-                <input type="text" id="customer-name" required class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="Your full name">
+              <div id="customer-fields">
+                <div class="mb-3.5">
+                  <label class="block text-sm font-medium text-stone-700 mb-1">Full Name *</label>
+                  <input type="text" id="customer-name" required class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="Your full name">
+                </div>
+                <div class="mb-3.5">
+                  <label class="block text-sm font-medium text-stone-700 mb-1">Phone Number <span class="text-stone-400 font-normal">(for text when ready)</span></label>
+                  <input type="tel" id="customer-phone" class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="e.g. 4435551234">
+                </div>
+                <div id="pickup-date-wrapper" class="mb-3.5">
+                  <label class="block text-sm font-medium text-stone-700 mb-1">Pickup Date *</label>
+                  <input type="date" id="pickup-date" required class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
+                </div>
+                <div class="mb-3.5">
+                  <label class="block text-sm font-medium text-stone-700 mb-1">Special Notes / Allergies</label>
+                  <textarea id="special-notes" rows="2" class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="e.g. no nuts, sesame allergy..."></textarea>
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-stone-700 mb-1">Phone Number <span class="text-stone-400 font-normal">(for text when ready)</span></label>
-                <input type="tel" id="customer-phone" class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="e.g. 4435551234">
-              </div>
-              <div id="pickup-date-wrapper">
-                <label class="block text-sm font-medium text-stone-700 mb-1">Pickup Date *</label>
-                <input type="date" id="pickup-date" required class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-stone-700 mb-1">Special Notes / Allergies</label>
-                <textarea id="special-notes" rows="2" class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="e.g. no nuts, sesame allergy..."></textarea>
+              <div id="walkup-notice" class="hidden bg-teal-50 border border-teal-200 rounded-xl p-3 text-sm text-teal-900 mb-1">
+                <strong>Walk-Up mode</strong> — just add items and place the order. No name or phone needed.
               </div>
               <div>
                 <label class="block text-sm font-medium text-stone-700 mb-2">Payment Method</label>
@@ -278,15 +283,26 @@
       document.getElementById('btn-walkup').className = mode === 'walkup'
         ? 'px-5 py-2.5 rounded-lg text-sm font-semibold bg-teal-800 text-white transition'
         : 'px-5 py-2.5 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100 transition';
-      const wrap = document.getElementById('pickup-date-wrapper');
-      const inp = document.getElementById('pickup-date');
+
+      const customerFields = document.getElementById('customer-fields');
+      const walkupNotice = document.getElementById('walkup-notice');
+      const nameInput = document.getElementById('customer-name');
+      const dateInput = document.getElementById('pickup-date');
+
       if (mode === 'walkup') {
-        wrap.classList.add('hidden');
-        inp.removeAttribute('required');
-        inp.value = new Date().toISOString().slice(0,10);
+        // Hide name, phone, date, notes — pure quick order
+        if (customerFields) customerFields.classList.add('hidden');
+        if (walkupNotice) walkupNotice.classList.remove('hidden');
+        nameInput.removeAttribute('required');
+        nameInput.value = 'Walk-up';
+        dateInput.removeAttribute('required');
+        dateInput.value = new Date().toISOString().slice(0,10);
       } else {
-        wrap.classList.remove('hidden');
-        inp.setAttribute('required','required');
+        if (customerFields) customerFields.classList.remove('hidden');
+        if (walkupNotice) walkupNotice.classList.add('hidden');
+        nameInput.setAttribute('required', 'required');
+        if (nameInput.value === 'Walk-up') nameInput.value = '';
+        dateInput.setAttribute('required', 'required');
       }
     }
 
@@ -382,10 +398,11 @@
       e.preventDefault();
       const ids = Object.keys(state.cart);
       if (!ids.length) return;
-      const name = document.getElementById('customer-name').value.trim();
+      let name = document.getElementById('customer-name').value.trim();
       const phone = document.getElementById('customer-phone').value.trim();
       const pickupDate = document.getElementById('pickup-date').value;
       const notes = document.getElementById('special-notes').value.trim();
+      if (state.orderMode === 'walkup' && (!name || name === 'Walk-up')) name = 'Walk-up';
       const payment = document.querySelector('input[name="payment"]:checked').value;
       const items = [];
       let total = 0;
