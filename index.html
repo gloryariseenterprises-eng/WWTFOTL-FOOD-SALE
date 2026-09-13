@@ -618,13 +618,19 @@
           <div class="lg:col-span-2 space-y-3">
             <div class="bg-white rounded-2xl card-shadow p-4">
               <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Scan Code</h2>
-              <p class="text-xs text-stone-500 mb-2">Point camera at item code or QR</p>
+              <p class="text-xs text-stone-500 mb-2">Point camera at the printed QR code</p>
               <div id="reader" class="w-full overflow-hidden rounded-xl bg-stone-900 min-h-[200px] mb-2"></div>
-              <div class="flex gap-2">
+              <div class="flex gap-2 mb-2">
                 <button id="start-scan-btn" onclick="startScanner()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl text-sm font-bold">▶ Start Camera</button>
                 <button onclick="stopScanner()" class="flex-1 bg-stone-200 hover:bg-stone-300 py-3 rounded-xl text-sm font-bold">Stop</button>
               </div>
-              <p id="scan-status" class="text-xs text-center mt-2 font-medium text-stone-500">Camera off</p>
+              <p id="scan-status" class="text-xs text-center mb-3 font-medium text-stone-500">Camera off</p>
+              <div class="flex gap-2">
+                <input id="manual-code-input" type="text" placeholder="Or type code e.g. E1" 
+                  class="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm font-mono uppercase"
+                  onkeydown="if(event.key==='Enter')manualAddCode()">
+                <button onclick="manualAddCode()" class="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-semibold">Add</button>
+              </div>
             </div>
 
             <div class="bg-white rounded-2xl card-shadow p-4">
@@ -636,16 +642,21 @@
 
       window.walkupCart = {};
 
-      // Big item cards
+      // Big item cards with − / + controls
       const menuEl = document.getElementById('walkup-menu');
       menuEl.innerHTML = state.menu.map(item => `
-        <button type="button" onclick="walkupQty('${item.id}', 1)"
-          class="relative text-left rounded-xl border-2 border-stone-200 hover:border-teal-600 active:bg-teal-50 p-3 transition">
-          <div class="font-bold text-sm leading-tight mb-0.5">${item.name}</div>
-          <div class="text-xs text-stone-500">$${item.price.toFixed(2)} · ${item.stock} left</div>
+        <div class="relative text-left rounded-xl border-2 border-stone-200 p-3">
+          <div class="font-bold text-sm leading-tight mb-0.5 pr-8">${item.name}</div>
+          <div class="text-xs text-stone-500 mb-2">$${item.price.toFixed(2)} · ${item.stock} left</div>
           <div class="absolute top-2 right-2 font-mono text-[10px] bg-stone-100 px-1.5 py-0.5 rounded">#${item.code}</div>
-          <div id="wq-${item.id}" class="mt-2 text-center text-lg font-bold text-teal-800 min-h-[1.5rem]">0</div>
-        </button>`).join('');
+          <div class="flex items-center justify-between gap-1">
+            <button type="button" onclick="walkupQty('${item.id}', -1)"
+              class="w-10 h-10 rounded-full bg-stone-100 hover:bg-red-100 active:bg-red-200 text-xl font-bold flex items-center justify-center">−</button>
+            <div id="wq-${item.id}" class="text-center text-xl font-bold text-teal-800 min-w-[2rem]">0</div>
+            <button type="button" onclick="walkupQty('${item.id}', 1)"
+              class="w-10 h-10 rounded-full bg-teal-100 hover:bg-teal-200 active:bg-teal-300 text-xl font-bold flex items-center justify-center">+</button>
+          </div>
+        </div>`).join('');
 
       // Code shortcut chips
       const codesEl = document.getElementById('walkup-codes');
@@ -705,46 +716,94 @@
 
     function startScanner() {
       if (typeof Html5Qrcode === 'undefined') {
-        document.getElementById('scan-status').textContent = 'Scanner library failed to load. Use the code buttons instead.';
+        document.getElementById('scan-status').textContent = 'Scanner library failed to load. Use + buttons or type a code.';
         return;
       }
       stopScanner();
+      const readerEl = document.getElementById('reader');
+      if (!readerEl) return;
       html5QrCode = new Html5Qrcode('reader');
-      document.getElementById('scan-status').textContent = 'Starting camera…';
-      Html5Qrcode.getCameras().then(cameras => {
-        if (!cameras || !cameras.length) {
-          document.getElementById('scan-status').textContent = 'No camera found. Use code buttons.';
-          return;
+      document.getElementById('scan-status').textContent = 'Starting camera… allow permission if asked';
+
+      const onSuccess = (decoded) => {
+        const raw = (decoded || '').trim();
+        const code = raw.toUpperCase().replace(/^#/, '').replace(/\s/g, '');
+        // Match code, #code, or full id
+        const item = state.menu.find(i =>
+          i.code === code ||
+          i.code.toUpperCase() === code ||
+          i.id.toUpperCase() === code ||
+          ('#' + i.code) === raw.toUpperCase()
+        );
+        if (item) {
+          walkupQty(item.id, 1);
+          const st = document.getElementById('scan-status');
+          st.textContent = '✓ Added #' + item.code + ' — ' + item.name;
+          st.className = 'text-xs text-center mt-2 font-medium text-green-600';
+          setTimeout(() => { st.className = 'text-xs text-center mt-2 font-medium text-stone-500'; }, 1200);
+        } else {
+          document.getElementById('scan-status').textContent = 'Unknown code: ' + raw + ' (try typing it below)';
         }
-        // Prefer back camera
-        let camId = cameras[cameras.length - 1].id;
-        const back = cameras.find(c => /back|rear|environment/i.test(c.label));
-        if (back) camId = back.id;
-        html5QrCode.start(
-          camId,
-          { fps: 12, qrbox: { width: 250, height: 140 }, aspectRatio: 1.777 },
-          (decoded) => {
-            const code = decoded.trim().toUpperCase().replace(/^#/, '');
-            const item = state.menu.find(i => i.code === code || i.id.toUpperCase() === code);
-            if (item) {
-              walkupQty(item.id, 1);
-              const st = document.getElementById('scan-status');
-              st.textContent = `✓ Added #${item.code} — ${item.name}`;
-              st.classList.add('text-green-600');
-              setTimeout(() => st.classList.remove('text-green-600'), 800);
-            } else {
-              document.getElementById('scan-status').textContent = `Unknown: ${decoded}`;
-            }
-          },
-          () => {}
-        ).then(() => {
-          document.getElementById('scan-status').textContent = 'Camera on — scan a code';
-        }).catch(err => {
-          document.getElementById('scan-status').textContent = 'Camera error: ' + (err?.message || err);
+      };
+
+      // Try environment (back) camera first via constraints
+      const config = {
+        fps: 10,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.floor(minEdge * 0.7);
+          return { width: size, height: size };
+        },
+        aspectRatio: 1.0
+      };
+
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        onSuccess,
+        () => {}
+      ).then(() => {
+        document.getElementById('scan-status').textContent = 'Camera on — point at a QR or code';
+      }).catch(err1 => {
+        // Fallback: list cameras and pick one
+        Html5Qrcode.getCameras().then(cameras => {
+          if (!cameras || !cameras.length) {
+            document.getElementById('scan-status').textContent = 'No camera found. Use + buttons or type code.';
+            return;
+          }
+          let camId = cameras[0].id;
+          const back = cameras.find(c => /back|rear|environment/i.test(c.label || ''));
+          if (back) camId = back.id;
+          else if (cameras.length > 1) camId = cameras[cameras.length - 1].id;
+          html5QrCode.start(camId, config, onSuccess, () => {})
+            .then(() => {
+              document.getElementById('scan-status').textContent = 'Camera on — point at a QR or code';
+            })
+            .catch(err2 => {
+              document.getElementById('scan-status').textContent = 'Camera error: ' + (err2?.message || err2) + '. Use + buttons or type code.';
+            });
+        }).catch(() => {
+          document.getElementById('scan-status').textContent = 'Camera permission denied. Use + buttons or type code below.';
         });
-      }).catch(() => {
-        document.getElementById('scan-status').textContent = 'Camera permission needed. Allow access or use buttons.';
       });
+    }
+
+    function manualAddCode() {
+      const input = document.getElementById('manual-code-input');
+      if (!input) return;
+      const raw = (input.value || '').trim();
+      if (!raw) return;
+      const code = raw.toUpperCase().replace(/^#/, '').replace(/\s/g, '');
+      const item = state.menu.find(i =>
+        i.code === code || i.code.toUpperCase() === code || i.id.toUpperCase() === code
+      );
+      if (item) {
+        walkupQty(item.id, 1);
+        input.value = '';
+        document.getElementById('scan-status').textContent = '✓ Added #' + item.code + ' — ' + item.name;
+      } else {
+        document.getElementById('scan-status').textContent = 'Unknown code: ' + raw;
+      }
     }
 
     function stopScanner() {
