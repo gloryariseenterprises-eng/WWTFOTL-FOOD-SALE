@@ -575,51 +575,80 @@
     function renderAdminWalkup() {
       const content = document.getElementById('admin-tab-content');
       content.innerHTML = `
-        <div class="grid lg:grid-cols-2 gap-5">
-          <div class="bg-white rounded-2xl card-shadow p-5">
-            <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Quick Walk-Up Sale</h2>
-            <p class="text-xs text-stone-500 mb-4">Scan item codes with any phone camera or tap quantities. Stock is shared.</p>
-            <div class="mb-3">
-              <label class="text-sm font-medium">Customer name (optional)</label>
-              <input type="text" id="walkup-name" class="w-full mt-1 rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder="Walk-up or name">
+        <div class="grid lg:grid-cols-5 gap-4">
+          <!-- LEFT: Big item buttons + total + complete -->
+          <div class="lg:col-span-3 bg-white rounded-2xl card-shadow p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="font-display text-lg font-bold text-teal-900">Quick Walk-Up</h2>
+              <input type="text" id="walkup-name" class="rounded-lg border border-stone-200 px-3 py-1.5 text-sm w-40" placeholder="Name (optional)">
             </div>
-            <div id="walkup-menu" class="space-y-2 max-h-72 overflow-y-auto border border-stone-100 rounded-xl p-3 mb-3"></div>
-            <div class="flex justify-between font-bold text-lg mb-3"><span>Total</span><span id="walkup-total">$0.00</span></div>
-            <div class="flex gap-2 mb-3">
-              <label class="flex-1 cursor-pointer"><input type="radio" name="walkup-pay" value="cash" class="peer sr-only" checked><div class="border peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2 text-center text-sm font-medium">Cash</div></label>
-              <label class="flex-1 cursor-pointer"><input type="radio" name="walkup-pay" value="cashapp" class="peer sr-only"><div class="border peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2 text-center text-sm font-medium">Cash App</div></label>
-              <label class="flex-1 cursor-pointer"><input type="radio" name="walkup-pay" value="zelle" class="peer sr-only"><div class="border peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2 text-center text-sm font-medium">Zelle</div></label>
+
+            <!-- Big tappable item grid -->
+            <div id="walkup-menu" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4"></div>
+
+            <div class="flex items-center justify-between bg-stone-50 rounded-xl px-4 py-3 mb-3">
+              <span class="font-semibold text-stone-600">Total</span>
+              <span id="walkup-total" class="text-2xl font-bold text-teal-900">$0.00</span>
             </div>
-            <button onclick="submitWalkup()" class="w-full bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 rounded-xl">Complete Walk-Up (mark Paid)</button>
+
+            <div class="grid grid-cols-3 gap-2 mb-3">
+              <label class="cursor-pointer">
+                <input type="radio" name="walkup-pay" value="cash" class="peer sr-only" checked>
+                <div class="border-2 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-xl py-3 text-center text-sm font-semibold">Cash</div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="walkup-pay" value="cashapp" class="peer sr-only">
+                <div class="border-2 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-xl py-3 text-center text-sm font-semibold">Cash App</div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="walkup-pay" value="zelle" class="peer sr-only">
+                <div class="border-2 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-xl py-3 text-center text-sm font-semibold">Zelle</div>
+              </label>
+            </div>
+
+            <button onclick="submitWalkup()" class="w-full bg-teal-800 hover:bg-teal-900 active:bg-teal-950 text-white font-bold text-lg py-4 rounded-xl shadow">
+              Complete Sale → Mark Paid
+            </button>
           </div>
-          <div class="bg-white rounded-2xl card-shadow p-5">
-            <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Scan Item Code</h2>
-            <p class="text-xs text-stone-500 mb-3">Use any phone or tablet camera. Point at a printed code or the #E1 style codes on the menu.</p>
-            <div id="reader" class="w-full overflow-hidden rounded-xl bg-stone-100 min-h-[220px] mb-3"></div>
-            <div class="flex gap-2">
-              <button id="start-scan-btn" onclick="startScanner()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl text-sm font-medium">Start Camera</button>
-              <button onclick="stopScanner()" class="flex-1 bg-stone-200 hover:bg-stone-300 py-2.5 rounded-xl text-sm font-medium">Stop</button>
-            </div>
-            <p id="scan-status" class="text-xs text-stone-500 mt-2 text-center">Camera off</p>
-            <div class="mt-4 p-3 bg-stone-50 rounded-lg text-xs">
-              <p class="font-medium mb-1">Item codes (tap to add):</p>
-              <div class="flex flex-wrap gap-1.5">
-                ${state.menu.map(i => `<button onclick="walkupQty('${i.id}',1)" class="font-mono bg-white border px-2 py-1 rounded hover:bg-teal-50">#${i.code} ${i.name.split(' ')[0]}</button>`).join('')}
+
+          <!-- RIGHT: Scanner + code shortcuts -->
+          <div class="lg:col-span-2 space-y-3">
+            <div class="bg-white rounded-2xl card-shadow p-4">
+              <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Scan Code</h2>
+              <p class="text-xs text-stone-500 mb-2">Point camera at item code or QR</p>
+              <div id="reader" class="w-full overflow-hidden rounded-xl bg-stone-900 min-h-[200px] mb-2"></div>
+              <div class="flex gap-2">
+                <button id="start-scan-btn" onclick="startScanner()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl text-sm font-bold">▶ Start Camera</button>
+                <button onclick="stopScanner()" class="flex-1 bg-stone-200 hover:bg-stone-300 py-3 rounded-xl text-sm font-bold">Stop</button>
               </div>
+              <p id="scan-status" class="text-xs text-center mt-2 font-medium text-stone-500">Camera off</p>
+            </div>
+
+            <div class="bg-white rounded-2xl card-shadow p-4">
+              <p class="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Tap code to add</p>
+              <div id="walkup-codes" class="flex flex-wrap gap-2"></div>
             </div>
           </div>
         </div>`;
+
       window.walkupCart = {};
+
+      // Big item cards
       const menuEl = document.getElementById('walkup-menu');
       menuEl.innerHTML = state.menu.map(item => `
-        <div class="flex items-center justify-between text-sm">
-          <div><p class="font-medium">${item.name}</p><p class="text-xs text-stone-500">$${item.price.toFixed(2)} · ${item.stock} left · #${item.code}</p></div>
-          <div class="flex items-center gap-1.5">
-            <button type="button" onclick="walkupQty('${item.id}',-1)" class="w-7 h-7 rounded-full border flex items-center justify-center">−</button>
-            <span id="wq-${item.id}" class="w-5 text-center font-medium">0</span>
-            <button type="button" onclick="walkupQty('${item.id}',1)" class="w-7 h-7 rounded-full border flex items-center justify-center">+</button>
-          </div>
-        </div>`).join('');
+        <button type="button" onclick="walkupQty('${item.id}', 1)"
+          class="relative text-left rounded-xl border-2 border-stone-200 hover:border-teal-600 active:bg-teal-50 p-3 transition">
+          <div class="font-bold text-sm leading-tight mb-0.5">${item.name}</div>
+          <div class="text-xs text-stone-500">$${item.price.toFixed(2)} · ${item.stock} left</div>
+          <div class="absolute top-2 right-2 font-mono text-[10px] bg-stone-100 px-1.5 py-0.5 rounded">#${item.code}</div>
+          <div id="wq-${item.id}" class="mt-2 text-center text-lg font-bold text-teal-800 min-h-[1.5rem]">0</div>
+        </button>`).join('');
+
+      // Code shortcut chips
+      const codesEl = document.getElementById('walkup-codes');
+      codesEl.innerHTML = state.menu.map(i =>
+        `<button onclick="walkupQty('${i.id}',1)" class="font-mono text-sm bg-stone-100 hover:bg-teal-100 active:bg-teal-200 border border-stone-200 px-3 py-2 rounded-lg font-semibold">#${i.code}</button>`
+      ).join('');
     }
 
     function walkupQty(id, delta) {
@@ -630,7 +659,11 @@
       if (next < 0 || next > item.stock) return;
       if (next === 0) delete window.walkupCart[id]; else window.walkupCart[id] = next;
       const el = document.getElementById('wq-' + id);
-      if (el) el.textContent = next;
+      if (el) {
+        el.textContent = next > 0 ? next : '0';
+        el.classList.add('scale-125', 'text-teal-600');
+        setTimeout(() => el.classList.remove('scale-125', 'text-teal-600'), 150);
+      }
       let total = 0;
       Object.keys(window.walkupCart || {}).forEach(k => {
         const it = state.menu.find(i => i.id === k);
@@ -674,33 +707,40 @@
       }
       stopScanner();
       html5QrCode = new Html5Qrcode('reader');
+      document.getElementById('scan-status').textContent = 'Starting camera…';
       Html5Qrcode.getCameras().then(cameras => {
         if (!cameras || !cameras.length) {
           document.getElementById('scan-status').textContent = 'No camera found. Use code buttons.';
           return;
         }
-        const camId = cameras[cameras.length - 1].id;
+        // Prefer back camera
+        let camId = cameras[cameras.length - 1].id;
+        const back = cameras.find(c => /back|rear|environment/i.test(c.label));
+        if (back) camId = back.id;
         html5QrCode.start(
           camId,
-          { fps: 10, qrbox: { width: 220, height: 120 } },
+          { fps: 12, qrbox: { width: 250, height: 140 }, aspectRatio: 1.777 },
           (decoded) => {
             const code = decoded.trim().toUpperCase().replace(/^#/, '');
             const item = state.menu.find(i => i.code === code || i.id.toUpperCase() === code);
             if (item) {
               walkupQty(item.id, 1);
-              document.getElementById('scan-status').textContent = `Added #${item.code} ${item.name}`;
+              const st = document.getElementById('scan-status');
+              st.textContent = `✓ Added #${item.code} — ${item.name}`;
+              st.classList.add('text-green-600');
+              setTimeout(() => st.classList.remove('text-green-600'), 800);
             } else {
-              document.getElementById('scan-status').textContent = `Unknown code: ${decoded}`;
+              document.getElementById('scan-status').textContent = `Unknown: ${decoded}`;
             }
           },
           () => {}
         ).then(() => {
-          document.getElementById('scan-status').textContent = 'Camera on — point at a code';
+          document.getElementById('scan-status').textContent = 'Camera on — scan a code';
         }).catch(err => {
           document.getElementById('scan-status').textContent = 'Camera error: ' + (err?.message || err);
         });
       }).catch(() => {
-        document.getElementById('scan-status').textContent = 'Could not access cameras. Use HTTPS or allow permission.';
+        document.getElementById('scan-status').textContent = 'Camera permission needed. Allow access or use buttons.';
       });
     }
 
