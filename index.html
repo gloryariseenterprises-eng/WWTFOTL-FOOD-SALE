@@ -6,6 +6,7 @@
   <title>Women With The Fear Of The Lord — Monthly Food Sale</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -145,6 +146,7 @@
           <button onclick="switchAdminTab('walkup')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-700">Walk-up</button>
           <button onclick="switchAdminTab('orders')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Orders</button>
           <button onclick="switchAdminTab('labels')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Labels</button>
+          <button onclick="switchAdminTab('codes')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Codes</button>
           <button onclick="switchAdminTab('menu')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Menu</button>
           <button onclick="switchAdminTab('reports')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Reports</button>
           <button onclick="logoutAdmin()" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-900/70 ml-1">Logout</button>
@@ -476,6 +478,7 @@
       if (tab === 'orders') renderAdminOrders();
       else if (tab === 'walkup') renderAdminWalkup();
       else if (tab === 'labels') renderAdminLabels();
+      else if (tab === 'codes') renderAdminCodes();
       else if (tab === 'menu') renderAdminMenu();
       else if (tab === 'reports') renderAdminReports();
       renderAdminStats();
@@ -847,43 +850,197 @@
       navigator.clipboard.writeText(ta.value).then(() => alert('Copied! Paste into Katasymbol app.')).catch(() => alert('Select the text and copy manually.'));
     }
 
+    function renderAdminCodes() {
+      const content = document.getElementById('admin-tab-content');
+      content.innerHTML = `
+        <div class="bg-white rounded-2xl card-shadow p-5 no-print">
+          <div class="flex flex-wrap justify-between items-center gap-3 mb-2">
+            <div>
+              <h2 class="font-display text-lg font-bold text-teal-900">Printable Item Codes</h2>
+              <p class="text-sm text-stone-500">Big codes + QR codes for taping on food packages. Print this page.</p>
+            </div>
+            <button onclick="window.print()" class="bg-teal-800 hover:bg-teal-900 text-white font-semibold px-5 py-2.5 rounded-xl">🖨 Print Codes</button>
+          </div>
+          <p class="text-xs text-stone-500 mb-5">Tip: Use landscape orientation and “More settings → Background graphics” if your browser offers it, so the borders print clearly.</p>
+        </div>
+
+        <div id="print-codes-area" class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+          ${state.menu.map(item => `
+            <div class="code-card bg-white border-2 border-stone-800 rounded-xl p-4 flex flex-col items-center text-center break-inside-avoid">
+              <div class="font-mono font-black text-4xl tracking-wider mb-1">#${item.code}</div>
+              <div class="font-bold text-base leading-tight mb-1">${item.name}</div>
+              <div class="text-sm text-stone-600 mb-3">$${item.price.toFixed(2)}</div>
+              <div id="qr-${item.id}" class="qr-box flex justify-center"></div>
+              <div class="text-[10px] text-stone-400 mt-2 font-mono">${item.code}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <style>
+          @media print {
+            body * { visibility: hidden !important; }
+            #print-codes-area, #print-codes-area * { visibility: visible !important; }
+            #print-codes-area { position: absolute; left: 0; top: 0; width: 100%; display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 8px; }
+            .code-card { border: 2px solid #000 !important; break-inside: avoid; page-break-inside: avoid; }
+            .no-print { display: none !important; }
+            #admin-view header, #admin-stats { display: none !important; }
+          }
+        </style>
+      `;
+
+      // Generate QR codes after DOM is ready
+      setTimeout(() => {
+        state.menu.forEach(item => {
+          const el = document.getElementById('qr-' + item.id);
+          if (!el) return;
+          el.innerHTML = '';
+          if (typeof QRCode !== 'undefined') {
+            new QRCode(el, {
+              text: item.code,
+              width: 120,
+              height: 120,
+              colorDark: '#000000',
+              colorLight: '#ffffff',
+              correctLevel: QRCode.CorrectLevel.M
+            });
+          } else {
+            el.innerHTML = '<div class="text-xs text-stone-400">QR unavailable</div>';
+          }
+        });
+      }, 50);
+    }
+
     function renderAdminMenu() {
       const content = document.getElementById('admin-tab-content');
       content.innerHTML = `
         <div class="bg-white rounded-2xl card-shadow p-5">
-          <div class="flex justify-between items-center mb-4">
+          <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
             <div>
               <h2 class="font-display text-lg font-bold text-teal-900">Menu & Inventory</h2>
-              <p class="text-xs text-stone-500">Item codes (E1, S1…) can be scanned in Walk-up. Stock is shared.</p>
+              <p class="text-xs text-stone-500">Edit items, prices, codes, and stock. Codes are what you print and scan.</p>
             </div>
-            <button onclick="resetStockToDefault()" class="text-xs text-teal-700 hover:underline">Reset demo stock</button>
+            <div class="flex gap-2">
+              <button onclick="addMenuItem()" class="bg-teal-800 hover:bg-teal-900 text-white text-sm font-semibold px-4 py-2 rounded-xl">+ Add Item</button>
+              <button onclick="resetStockToDefault()" class="text-xs text-stone-500 hover:underline px-2">Reset demo stock</button>
+            </div>
           </div>
+
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
-              <thead><tr class="border-b text-left text-stone-500 text-xs">
-                <th class="pb-2 pr-3">Code</th><th class="pb-2 pr-3">Item</th><th class="pb-2 pr-3">Category</th><th class="pb-2 pr-3">Price</th><th class="pb-2">Stock</th>
-              </tr></thead>
-              <tbody>
-                ${state.menu.map(item => `
-                  <tr class="border-b border-stone-50">
-                    <td class="py-2.5 pr-3 font-mono font-semibold">#${item.code}</td>
-                    <td class="py-2.5 pr-3 font-medium">${item.name}</td>
-                    <td class="py-2.5 pr-3 text-stone-500">${item.category}</td>
-                    <td class="py-2.5 pr-3">$${item.price.toFixed(2)}</td>
-                    <td class="py-2.5"><input type="number" min="0" value="${item.stock}" onchange="updateStock('${item.id}',this.value)" class="w-16 rounded border border-stone-200 px-2 py-1 text-center"></td>
-                  </tr>`).join('')}
+              <thead>
+                <tr class="border-b text-left text-stone-500 text-xs">
+                  <th class="pb-2 pr-2">Code</th>
+                  <th class="pb-2 pr-2">Item Name</th>
+                  <th class="pb-2 pr-2">Category</th>
+                  <th class="pb-2 pr-2">Price $</th>
+                  <th class="pb-2 pr-2">Stock</th>
+                  <th class="pb-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="menu-edit-body">
+                ${state.menu.map((item, idx) => `
+                  <tr class="border-b border-stone-50" data-id="${item.id}">
+                    <td class="py-2 pr-2">
+                      <input type="text" value="${item.code}" onchange="editMenuField('${item.id}','code',this.value)"
+                        class="w-14 font-mono font-semibold rounded border border-stone-200 px-1.5 py-1 text-center uppercase">
+                    </td>
+                    <td class="py-2 pr-2">
+                      <input type="text" value="${item.name}" onchange="editMenuField('${item.id}','name',this.value)"
+                        class="w-full min-w-[140px] rounded border border-stone-200 px-2 py-1">
+                    </td>
+                    <td class="py-2 pr-2">
+                      <select onchange="editMenuField('${item.id}','category',this.value)" class="rounded border border-stone-200 px-1.5 py-1">
+                        <option value="Entrées" ${item.category==='Entrées'?'selected':''}>Entrées</option>
+                        <option value="Salad" ${item.category==='Salad'?'selected':''}>Salad</option>
+                        <option value="Desserts" ${item.category==='Desserts'?'selected':''}>Desserts</option>
+                        <option value="Other" ${item.category==='Other'?'selected':''}>Other</option>
+                      </select>
+                    </td>
+                    <td class="py-2 pr-2">
+                      <input type="number" min="0" step="0.01" value="${item.price}" onchange="editMenuField('${item.id}','price',this.value)"
+                        class="w-16 rounded border border-stone-200 px-1.5 py-1 text-center">
+                    </td>
+                    <td class="py-2 pr-2">
+                      <input type="number" min="0" value="${item.stock}" onchange="editMenuField('${item.id}','stock',this.value)"
+                        class="w-16 rounded border border-stone-200 px-1.5 py-1 text-center">
+                    </td>
+                    <td class="py-2">
+                      <button onclick="deleteMenuItem('${item.id}')" class="text-red-600 hover:bg-red-50 text-xs px-2 py-1 rounded">Delete</button>
+                    </td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
           </div>
+
+          <div class="mt-5 p-4 bg-stone-50 rounded-xl text-sm text-stone-600">
+            <p class="font-semibold text-stone-800 mb-1">How preprinted codes work</p>
+            <ol class="list-decimal list-inside space-y-1">
+              <li>Set a short code for each item (E1, E2, S1, D1…).</li>
+              <li>Print those codes (or QR codes containing the code) and put them on the food packages / signs.</li>
+              <li>In <strong>Admin → Walk-up</strong>, start the camera and scan the code — it adds the item and reduces stock.</li>
+              <li>Choose payment and tap <strong>Complete Sale</strong>.</li>
+            </ol>
+            <p class="mt-2 text-xs">Note: Scanning must be done inside the Admin Walk-up screen (browser needs the camera). There is no way for a random phone camera to record a sale without opening the app.</p>
+          </div>
         </div>`;
     }
-    function updateStock(id, val) {
+
+    function editMenuField(id, field, value) {
       const item = state.menu.find(i => i.id === id);
-      if (item) { item.stock = Math.max(0, parseInt(val,10)||0); saveState(); }
+      if (!item) return;
+      if (field === 'price' || field === 'stock') {
+        item[field] = Math.max(0, parseFloat(value) || 0);
+        if (field === 'price') item.price = Math.round(item.price * 100) / 100;
+        if (field === 'stock') item.stock = Math.floor(item.stock);
+      } else if (field === 'code') {
+        item.code = (value || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6) || item.code;
+      } else {
+        item[field] = value;
+      }
+      saveState();
     }
+
+    function addMenuItem() {
+      const id = 'item' + Date.now().toString(36);
+      const codes = state.menu.map(i => i.code);
+      let code = 'X1';
+      for (let n = 1; n < 100; n++) {
+        const c = 'X' + n;
+        if (!codes.includes(c)) { code = c; break; }
+      }
+      state.menu.push({
+        id,
+        code,
+        name: 'New Item',
+        category: 'Other',
+        price: 10,
+        stock: 10
+      });
+      saveState();
+      renderAdminMenu();
+    }
+
+    function deleteMenuItem(id) {
+      if (!confirm('Delete this menu item?')) return;
+      state.menu = state.menu.filter(i => i.id !== id);
+      saveState();
+      renderAdminMenu();
+    }
+
+    function updateStock(id, val) {
+      editMenuField(id, 'stock', val);
+    }
+
     function resetStockToDefault() {
-      if (!confirm('Reset all stock to original quantities?')) return;
-      state.menu = DEFAULT_MENU.map(x => ({...x}));
+      if (!confirm('Reset all stock quantities to the original demo numbers? (Names and prices stay the same)')) return;
+      const defaults = {
+        ent1:29, ent2:18, ent3:15, ent4:20, ent5:12,
+        sal1:3, des1:12, des2:6, des3:12
+      };
+      state.menu.forEach(item => {
+        if (defaults[item.id] !== undefined) item.stock = defaults[item.id];
+      });
       saveState();
       renderAdminMenu();
     }
