@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Women With The Fear Of The Lord — Monthly Food Sale</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a' }
+          },
+          fontFamily: {
+            serif: ['Georgia','Cambria','serif'],
+            sans: ['Inter','system-ui','sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .font-display { font-family: 'Playfair Display', Georgia, serif; }
+    .stock-low { color: #dc2626; font-weight: 600; }
+    .stock-ok { color: #059669; }
+    .modal-backdrop { background: rgba(15,23,42,0.55); backdrop-filter: blur(4px); }
+    .card-shadow { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
+    @media print {
+      body * { visibility: hidden; }
+      #label-print-area, #label-print-area * { visibility: visible; }
+      #label-print-area { position: absolute; left: 0; top: 0; }
+      .no-print { display: none !important; }
+    }
+    .label-40x30 { width: 151px; height: 113px; }
+    .label-50x80 { width: 189px; height: 302px; }
+    .label-round50 { width: 189px; height: 189px; border-radius: 50%; }
+  </style>
+</head>
+<body class="bg-stone-50 text-stone-800 min-h-screen">
+
+  <div id="customer-view">
+    <header class="bg-teal-900 text-white">
+      <div class="max-w-5xl mx-auto px-4 py-7 text-center">
+        <div class="flex justify-center mb-3">
+          <img src="logo.png" alt="WWFL Logo" class="w-16 h-16 rounded-full shadow-lg border-2 border-teal-200/40" onerror="this.style.display='none'">
+        </div>
+        <p class="text-teal-200 text-xs tracking-[0.2em] uppercase font-medium mb-1">Women With The Fear Of The Lord</p>
+        <h1 class="font-display text-3xl md:text-4xl font-bold mb-2">Monthly Food Sale</h1>
+        <div class="inline-flex items-center gap-2 bg-teal-800/60 rounded-full px-4 py-1.5 text-sm mb-3">
+          <span id="sale-date-display">Sunday, September 13, 2026</span>
+        </div>
+        <p class="text-teal-100 text-sm max-w-lg mx-auto leading-relaxed">
+          Order a warm, home-cooked meal and support our ministry. Pre-order or walk-up same day.
+        </p>
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-8">
+      <div class="flex justify-center mb-7">
+        <div class="bg-white rounded-xl p-1.5 card-shadow inline-flex">
+          <button id="btn-preorder" onclick="setOrderMode('preorder')" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-teal-800 text-white transition">Pre-Order</button>
+          <button id="btn-walkup" onclick="setOrderMode('walkup')" class="px-5 py-2.5 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100 transition">Walk-Up / Same Day</button>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-5 gap-8">
+        <div class="lg:col-span-3 space-y-6">
+          <div class="bg-white rounded-2xl card-shadow p-6">
+            <h2 class="font-display text-xl font-bold text-teal-900 mb-1">Build Your Order</h2>
+            <p class="text-sm text-stone-500 mb-5">Stock updates in real time. Item codes shown for scanning.</p>
+            <div id="menu-container" class="space-y-7"></div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-2">
+          <div class="bg-white rounded-2xl card-shadow p-6 sticky top-5">
+            <h2 class="font-display text-xl font-bold text-teal-900 mb-4">Order Summary</h2>
+            <div id="cart-items" class="space-y-2 mb-4 min-h-[50px]">
+              <p class="text-stone-400 text-sm text-center py-4">No items selected yet.</p>
+            </div>
+            <div class="border-t border-stone-100 pt-3 mb-5 flex justify-between items-center">
+              <span class="font-medium">Total</span>
+              <span id="cart-total" class="text-2xl font-bold text-teal-900">$0.00</span>
+            </div>
+
+            <form id="order-form" class="space-y-3.5" onsubmit="submitOrder(event)">
+              <div>
+                <label class="block text-sm font-medium text-stone-700 mb-1">Full Name *</label>
+                <input type="text" id="customer-name" required class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="Your full name">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-stone-700 mb-1">Phone Number <span class="text-stone-400 font-normal">(for text when ready)</span></label>
+                <input type="tel" id="customer-phone" class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="e.g. 4435551234">
+              </div>
+              <div id="pickup-date-wrapper">
+                <label class="block text-sm font-medium text-stone-700 mb-1">Pickup Date *</label>
+                <input type="date" id="pickup-date" required class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-stone-700 mb-1">Special Notes / Allergies</label>
+                <textarea id="special-notes" rows="2" class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="e.g. no nuts, sesame allergy..."></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-stone-700 mb-2">Payment Method</label>
+                <div class="grid grid-cols-3 gap-2">
+                  <label class="cursor-pointer"><input type="radio" name="payment" value="cashapp" class="peer sr-only" checked><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash App</div></label>
+                  <label class="cursor-pointer"><input type="radio" name="payment" value="zelle" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Zelle</div></label>
+                  <label class="cursor-pointer"><input type="radio" name="payment" value="cash" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash</div></label>
+                </div>
+              </div>
+              <div id="payment-details" class="bg-stone-50 rounded-lg p-3 text-sm hidden"></div>
+              <button type="submit" id="place-order-btn" disabled class="w-full bg-teal-800 hover:bg-teal-900 disabled:bg-stone-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition">Place Order</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="text-center py-8 text-stone-400 text-sm no-print">
+      <p>Women With The Fear Of The Lord Ministry</p>
+      <p class="mt-1"><a href="#" onclick="showAdminLogin(); return false;" class="underline hover:text-teal-700">Staff / Admin Login</a></p>
+    </footer>
+  </div>
+
+  <div id="admin-view" class="hidden min-h-screen bg-stone-100">
+    <header class="bg-teal-900 text-white sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-3 py-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-3">
+          <img src="logo.png" alt="Logo" class="w-9 h-9 rounded-full border border-teal-300/50" onerror="this.style.display='none'">
+          <div>
+            <p class="text-teal-200 text-xs tracking-wider uppercase">WWFL Food Sale</p>
+            <h1 class="font-display text-lg font-bold leading-tight">Admin Dashboard</h1>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button onclick="switchAdminTab('walkup')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-700">Walk-up</button>
+          <button onclick="switchAdminTab('orders')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Orders</button>
+          <button onclick="switchAdminTab('labels')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Labels</button>
+          <button onclick="switchAdminTab('menu')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Menu</button>
+          <button onclick="switchAdminTab('reports')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Reports</button>
+          <button onclick="logoutAdmin()" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-900/70 ml-1">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-3 py-5">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5" id="admin-stats"></div>
+      <div id="admin-tab-content"></div>
+    </div>
+  </div>
+
+  <div id="admin-login-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-7">
+      <div class="text-center mb-5">
+        <img src="logo.png" class="w-14 h-14 rounded-full mx-auto mb-3 border-2 border-teal-100" onerror="this.style.display='none'">
+        <h2 class="font-display text-xl font-bold text-teal-900">Admin Dashboard</h2>
+        <p class="text-sm text-stone-500 mt-1">Women With The Fear Of The Lord</p>
+      </div>
+      <div class="space-y-3">
+        <input type="password" id="admin-password" class="w-full rounded-lg border border-stone-200 px-3 py-2.5" placeholder="Admin password" onkeydown="if(event.key==='Enter')attemptAdminLogin()">
+        <button onclick="attemptAdminLogin()" class="w-full bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 rounded-xl">Unlock Dashboard</button>
+        <button onclick="hideAdminLogin()" class="w-full text-stone-500 text-sm py-1.5">Cancel</button>
+      </div>
+      <p id="login-error" class="text-red-600 text-sm text-center mt-2 hidden">Incorrect password</p>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-7 text-center">
+      <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <h2 class="font-display text-2xl font-bold text-teal-900 mb-1">Order Received!</h2>
+      <p class="text-stone-600 mb-1">Thank you, <span id="confirm-name" class="font-semibold"></span>.</p>
+      <p class="text-sm text-stone-500 mb-3">Order ID: <span id="confirm-id" class="font-mono font-medium"></span></p>
+      <div id="confirm-details" class="bg-stone-50 rounded-xl p-3 text-left text-sm mb-4 space-y-0.5"></div>
+      <p class="text-sm text-stone-500 mb-5">Saved as <strong>Pending Payment</strong>. We’ll text you when it’s ready if you provided a phone number.</p>
+      <button onclick="closeConfirm()" class="w-full bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 rounded-xl">Done</button>
+    </div>
+  </div>
+
+  <div id="label-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-display text-lg font-bold text-teal-900">Print Label — SUPVAN T50M Pro</h3>
+        <button onclick="closeLabelModal()" class="text-stone-400 hover:text-stone-600 text-xl leading-none">&times;</button>
+      </div>
+      <div class="mb-3">
+        <label class="text-sm font-medium">Label size</label>
+        <div class="flex gap-2 mt-1">
+          <button onclick="setLabelSize('40x30')" id="ls-40x30" class="label-size-btn flex-1 py-2 rounded-lg border text-sm font-medium bg-teal-50 border-teal-700">40×30 mm</button>
+          <button onclick="setLabelSize('50x80')" id="ls-50x80" class="label-size-btn flex-1 py-2 rounded-lg border text-sm font-medium">50×80 mm</button>
+          <button onclick="setLabelSize('round50')" id="ls-round50" class="label-size-btn flex-1 py-2 rounded-lg border text-sm font-medium">Ø50 mm</button>
+        </div>
+      </div>
+      <div id="label-preview-wrap" class="flex justify-center bg-stone-100 rounded-xl p-6 mb-4 min-h-[140px]">
+        <div id="label-print-area" class="bg-white border border-stone-300 shadow text-center flex flex-col items-center justify-center p-2 overflow-hidden"></div>
+      </div>
+      <p class="text-xs text-stone-500 mb-3 leading-relaxed">
+        <strong>How to print on SUPVAN T50M Pro:</strong><br>
+        1. Open the <strong>Katasymbol</strong> (or SUPRINT) app on your phone and connect the printer via Bluetooth.<br>
+        2. Create a new label of the selected size (or use a template).<br>
+        3. Copy the text below into the app, or take a screenshot of the preview and import the image.<br>
+        4. Or use the browser Print button and choose the printer if it appears as a system printer (USB on computer).
+      </p>
+      <textarea id="label-text-for-app" class="w-full text-xs border rounded-lg p-2 mb-3 h-20 font-mono" readonly></textarea>
+      <div class="flex gap-2">
+        <button onclick="copyLabelText()" class="flex-1 bg-stone-100 hover:bg-stone-200 py-2.5 rounded-xl text-sm font-medium">Copy Text</button>
+        <button onclick="window.print()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl text-sm font-medium">Browser Print</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_PASSWORD = 'fearthelord2026';
+    const STORAGE_KEY = 'wwfl_food_sale_v3';
+
+    let state = {
+      orderMode: 'preorder',
+      cart: {},
+      menu: [],
+      orders: [],
+      settings: {
+        saleDateLabel: 'Sunday, September 13, 2026',
+        cashAppTag: '$Boardma',
+        zelleInfo: 'Send to the ministry Zelle (ask staff for details)',
+        readySmsTemplate: 'Hi {name}! Your WWFL order {id} is READY for pickup. Total ${total}. See you soon! – Women With The Fear Of The Lord'
+      }
+    };
+
+    let currentLabelOrder = null;
+    let currentLabelSize = '40x30';
+    let html5QrCode = null;
+
+    const DEFAULT_MENU = [
+      { id: 'ent1', code: 'E1', name: 'Chicken W/ Jollof Rice & Veg', category: 'Entrées', price: 15, stock: 29 },
+      { id: 'ent2', code: 'E2', name: 'Turkey Hoagie w/ Cheese', category: 'Entrées', price: 15, stock: 18 },
+      { id: 'ent3', code: 'E3', name: 'Chicken Salad on Croissant', category: 'Entrées', price: 15, stock: 15 },
+      { id: 'ent4', code: 'E4', name: 'Lasagna', category: 'Entrées', price: 15, stock: 20 },
+      { id: 'ent5', code: 'E5', name: 'Chicken Alfredo w/ Vegetables', category: 'Entrées', price: 15, stock: 12 },
+      { id: 'sal1', code: 'S1', name: 'Garden Salad', category: 'Salad', price: 10, stock: 3 },
+      { id: 'des1', code: 'D1', name: 'Puff-Puff', category: 'Desserts', price: 5, stock: 12 },
+      { id: 'des2', code: 'D2', name: 'Cakes/Cupcake', category: 'Desserts', price: 5, stock: 6 },
+      { id: 'des3', code: 'D3', name: 'Meat Pie', category: 'Desserts', price: 5, stock: 12 }
+    ];
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const p = JSON.parse(raw);
+          state.menu = p.menu || DEFAULT_MENU.map(x => ({...x}));
+          state.orders = p.orders || [];
+          state.settings = { ...state.settings, ...(p.settings || {}) };
+        } else {
+          state.menu = DEFAULT_MENU.map(x => ({...x}));
+          saveState();
+        }
+      } catch(e) {
+        state.menu = DEFAULT_MENU.map(x => ({...x}));
+      }
+    }
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        menu: state.menu, orders: state.orders, settings: state.settings
+      }));
+    }
+
+    function setOrderMode(mode) {
+      state.orderMode = mode;
+      document.getElementById('btn-preorder').className = mode === 'preorder'
+        ? 'px-5 py-2.5 rounded-lg text-sm font-semibold bg-teal-800 text-white transition'
+        : 'px-5 py-2.5 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100 transition';
+      document.getElementById('btn-walkup').className = mode === 'walkup'
+        ? 'px-5 py-2.5 rounded-lg text-sm font-semibold bg-teal-800 text-white transition'
+        : 'px-5 py-2.5 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100 transition';
+      const wrap = document.getElementById('pickup-date-wrapper');
+      const inp = document.getElementById('pickup-date');
+      if (mode === 'walkup') {
+        wrap.classList.add('hidden');
+        inp.removeAttribute('required');
+        inp.value = new Date().toISOString().slice(0,10);
+      } else {
+        wrap.classList.remove('hidden');
+        inp.setAttribute('required','required');
+      }
+    }
+
+    function renderMenu() {
+      const container = document.getElementById('menu-container');
+      const cats = [...new Set(state.menu.map(i => i.category))];
+      let html = '';
+      cats.forEach(cat => {
+        const items = state.menu.filter(i => i.category === cat);
+        const price = items[0]?.price || 0;
+        html += `<div>
+          <div class="flex items-center gap-2 mb-2.5">
+            <span class="w-7 h-7 rounded-full bg-teal-100 text-teal-800 text-xs flex items-center justify-center font-bold">${cat[0]}</span>
+            <h3 class="font-semibold text-teal-900">${cat}</h3>
+            <span class="text-sm text-stone-500">$${price.toFixed(2)} each</span>
+          </div>
+          <div class="space-y-1.5">
+            ${items.map(item => {
+              const qty = state.cart[item.id] || 0;
+              const stockClass = item.stock <= 5 ? 'stock-low' : 'stock-ok';
+              const disabled = item.stock <= 0;
+              return `<div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 ${disabled?'opacity-50':''}">
+                <div class="min-w-0 flex-1 pr-2">
+                  <p class="font-medium text-stone-800 text-sm leading-tight">${item.name}</p>
+                  <p class="text-xs text-stone-500 mt-0.5">$${item.price.toFixed(2)} · <span class="${stockClass}">${item.stock} left</span> · <span class="font-mono bg-stone-100 px-1 rounded">#${item.code}</span></p>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button type="button" onclick="updateCart('${item.id}',-1)" class="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50" ${qty<=0?'disabled':''}>−</button>
+                  <span class="w-5 text-center text-sm font-medium">${qty}</span>
+                  <button type="button" onclick="updateCart('${item.id}',1)" class="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50" ${disabled||qty>=item.stock?'disabled':''}>+</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateCart(id, delta) {
+      const item = state.menu.find(i => i.id === id);
+      if (!item) return;
+      const cur = state.cart[id] || 0;
+      const next = cur + delta;
+      if (next < 0 || next > item.stock) return;
+      if (next === 0) delete state.cart[id]; else state.cart[id] = next;
+      renderMenu(); renderCart();
+    }
+
+    function renderCart() {
+      const el = document.getElementById('cart-items');
+      const ids = Object.keys(state.cart);
+      if (!ids.length) {
+        el.innerHTML = '<p class="text-stone-400 text-sm text-center py-4">No items selected yet.</p>';
+        document.getElementById('cart-total').textContent = '$0.00';
+        document.getElementById('place-order-btn').disabled = true;
+        return;
+      }
+      let total = 0;
+      el.innerHTML = ids.map(id => {
+        const item = state.menu.find(i => i.id === id);
+        const qty = state.cart[id];
+        const line = item.price * qty;
+        total += line;
+        return `<div class="flex justify-between text-sm"><span>${qty}× ${item.name}</span><span class="font-medium">$${line.toFixed(2)}</span></div>`;
+      }).join('');
+      document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+      document.getElementById('place-order-btn').disabled = false;
+    }
+
+    function updatePaymentDetails() {
+      const method = document.querySelector('input[name="payment"]:checked')?.value;
+      const box = document.getElementById('payment-details');
+      if (method === 'cashapp') {
+        box.classList.remove('hidden');
+        box.innerHTML = `<p class="font-medium text-stone-700">Send to Cash App</p><p class="text-teal-800 font-semibold text-lg">${state.settings.cashAppTag}</p><p class="text-xs text-stone-500 mt-0.5">Include your name. Order stays Pending until confirmed.</p>`;
+      } else if (method === 'zelle') {
+        box.classList.remove('hidden');
+        box.innerHTML = `<p class="font-medium text-stone-700">Zelle</p><p class="text-sm text-stone-600">${state.settings.zelleInfo}</p>`;
+      } else box.classList.add('hidden');
+    }
+
+    function generateOrderId() {
+      const d = new Date();
+      const y = String(d.getFullYear()).slice(2);
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      const r = Math.random().toString(36).substring(2,6).toUpperCase();
+      return `WWFL-${y}${m}${day}-${r}`;
+    }
+
+    function submitOrder(e) {
+      e.preventDefault();
+      const ids = Object.keys(state.cart);
+      if (!ids.length) return;
+      const name = document.getElementById('customer-name').value.trim();
+      const phone = document.getElementById('customer-phone').value.trim();
+      const pickupDate = document.getElementById('pickup-date').value;
+      const notes = document.getElementById('special-notes').value.trim();
+      const payment = document.querySelector('input[name="payment"]:checked').value;
+      const items = [];
+      let total = 0;
+      for (const id of ids) {
+        const item = state.menu.find(i => i.id === id);
+        const qty = state.cart[id];
+        if (qty > item.stock) { alert(`Only ${item.stock} of "${item.name}" left.`); return; }
+        items.push({ id, code: item.code, name: item.name, price: item.price, qty });
+        total += item.price * qty;
+        item.stock -= qty;
+      }
+      const order = {
+        id: generateOrderId(),
+        customerName: name,
+        phone,
+        type: state.orderMode,
+        pickupDate: state.orderMode === 'walkup' ? new Date().toISOString().slice(0,10) : pickupDate,
+        items, total, paymentMethod: payment,
+        status: 'pending',
+        notes,
+        createdAt: new Date().toISOString()
+      };
+      state.orders.unshift(order);
+      state.cart = {};
+      saveState();
+      renderMenu(); renderCart();
+      document.getElementById('confirm-name').textContent = name;
+      document.getElementById('confirm-id').textContent = order.id;
+      document.getElementById('confirm-details').innerHTML = `
+        <p><strong>Type:</strong> ${order.type==='walkup'?'Walk-Up':'Pre-Order'}</p>
+        <p><strong>Pickup:</strong> ${order.pickupDate}</p>
+        <p><strong>Payment:</strong> ${payment}</p>
+        <p><strong>Items:</strong> ${items.map(i=>`${i.qty}× ${i.name}`).join(', ')}</p>
+        <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+        ${notes?`<p><strong>Notes:</strong> ${notes}</p>`:''}`;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+      document.getElementById('order-form').reset();
+      if (state.orderMode === 'walkup') document.getElementById('pickup-date').value = new Date().toISOString().slice(0,10);
+      updatePaymentDetails();
+    }
+    function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); }
+
+    function showAdminLogin() {
+      document.getElementById('admin-login-modal').classList.remove('hidden');
+      document.getElementById('admin-password').value = '';
+      document.getElementById('login-error').classList.add('hidden');
+      setTimeout(() => document.getElementById('admin-password').focus(), 80);
+    }
+    function hideAdminLogin() { document.getElementById('admin-login-modal').classList.add('hidden'); }
+    function attemptAdminLogin() {
+      if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
+        hideAdminLogin();
+        document.getElementById('customer-view').classList.add('hidden');
+        document.getElementById('admin-view').classList.remove('hidden');
+        switchAdminTab('orders');
+      } else document.getElementById('login-error').classList.remove('hidden');
+    }
+    function logoutAdmin() {
+      stopScanner();
+      document.getElementById('admin-view').classList.add('hidden');
+      document.getElementById('customer-view').classList.remove('hidden');
+      renderMenu(); renderCart();
+    }
+
+    function switchAdminTab(tab) {
+      document.querySelectorAll('.admin-tab').forEach(b => {
+        b.classList.remove('bg-teal-700');
+        b.classList.add('hover:bg-teal-800');
+      });
+      stopScanner();
+      if (tab === 'orders') renderAdminOrders();
+      else if (tab === 'walkup') renderAdminWalkup();
+      else if (tab === 'labels') renderAdminLabels();
+      else if (tab === 'menu') renderAdminMenu();
+      else if (tab === 'reports') renderAdminReports();
+      renderAdminStats();
+    }
+
+    function renderAdminStats() {
+      const active = state.orders.filter(o => o.status !== 'cancelled');
+      const grand = active.reduce((s,o) => s + o.total, 0);
+      const paid = state.orders.filter(o => ['paid','ready','picked_up'].includes(o.status)).reduce((s,o) => s + o.total, 0);
+      const pending = state.orders.filter(o => o.status === 'pending').reduce((s,o) => s + o.total, 0);
+      document.getElementById('admin-stats').innerHTML = `
+        <div class="bg-white rounded-xl p-3.5 card-shadow"><p class="text-xs text-stone-500 uppercase tracking-wide">Total Orders</p><p class="text-2xl font-bold text-teal-900 mt-0.5">${active.length}</p></div>
+        <div class="bg-white rounded-xl p-3.5 card-shadow"><p class="text-xs text-stone-500 uppercase tracking-wide">Grand Total</p><p class="text-2xl font-bold text-teal-900 mt-0.5">$${grand.toFixed(2)}</p></div>
+        <div class="bg-white rounded-xl p-3.5 card-shadow"><p class="text-xs text-stone-500 uppercase tracking-wide">Confirmed Paid</p><p class="text-2xl font-bold text-green-700 mt-0.5">$${paid.toFixed(2)}</p></div>
+        <div class="bg-white rounded-xl p-3.5 card-shadow"><p class="text-xs text-stone-500 uppercase tracking-wide">Pending Payment</p><p class="text-2xl font-bold text-amber-600 mt-0.5">$${pending.toFixed(2)}</p></div>`;
+    }
+
+    function statusBadge(s) {
+      const m = { pending:'bg-amber-100 text-amber-800', paid:'bg-blue-100 text-blue-800', ready:'bg-green-100 text-green-800', picked_up:'bg-stone-200 text-stone-700', cancelled:'bg-red-100 text-red-700' };
+      return `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase ${m[s]||''}">${s.replace('_',' ')}</span>`;
+    }
+
+    function advanceStatus(id) {
+      const o = state.orders.find(x => x.id === id);
+      if (!o) return;
+      const flow = { pending:'paid', paid:'ready', ready:'picked_up' };
+      if (flow[o.status]) {
+        o.status = flow[o.status];
+        saveState();
+        renderAdminOrders();
+        renderAdminStats();
+      }
+    }
+
+    function cancelOrder(id) {
+      if (!confirm('Cancel order and restore stock?')) return;
+      const o = state.orders.find(x => x.id === id);
+      if (!o || o.status === 'cancelled') return;
+      o.items.forEach(line => {
+        const m = state.menu.find(i => i.id === line.id);
+        if (m) m.stock += line.qty;
+      });
+      o.status = 'cancelled';
+      saveState();
+      renderAdminOrders(); renderAdminStats();
+    }
+
+    function textCustomer(orderId) {
+      const o = state.orders.find(x => x.id === orderId);
+      if (!o || !o.phone) { alert('No phone number on this order.'); return; }
+      let phone = o.phone.replace(/\D/g,'');
+      if (phone.length === 10) phone = '1' + phone;
+      const body = state.settings.readySmsTemplate
+        .replace('{name}', o.customerName.split(' ')[0])
+        .replace('{id}', o.id)
+        .replace('{total}', o.total.toFixed(2));
+      window.location.href = `sms:${phone}?body=${encodeURIComponent(body)}`;
+    }
+
+    function renderAdminOrders() {
+      const statuses = ['pending','paid','ready','picked_up','cancelled'];
+      const content = document.getElementById('admin-tab-content');
+      let html = `<div class="grid md:grid-cols-5 gap-3">`;
+      statuses.forEach(st => {
+        const list = state.orders.filter(o => o.status === st);
+        html += `<div class="bg-white rounded-xl card-shadow overflow-hidden">
+          <div class="px-2.5 py-2 bg-stone-50 border-b flex justify-between items-center">
+            <span class="text-xs font-semibold capitalize">${st.replace('_',' ')}</span>
+            <span class="text-[10px] bg-stone-200 rounded-full px-1.5 py-0.5">${list.length}</span>
+          </div>
+          <div class="p-1.5 space-y-1.5 max-h-[62vh] overflow-y-auto">
+            ${list.length === 0 ? '<p class="text-xs text-stone-400 text-center py-5">No orders</p>' : list.map(o => `
+              <div class="border border-stone-100 rounded-lg p-2.5 text-xs">
+                <div class="flex justify-between items-start gap-1 mb-0.5">
+                  <p class="font-semibold text-stone-800 truncate">${o.customerName}</p>
+                  ${statusBadge(o.status)}
+                </div>
+                <p class="text-[10px] text-stone-400 font-mono">${o.id}</p>
+                <p class="text-stone-600 mt-0.5 leading-snug">${o.items.map(i => `${i.qty}× ${i.name}`).join(', ')}</p>
+                <p class="font-medium text-teal-900 mt-0.5">$${o.total.toFixed(2)} <span class="font-normal text-stone-500">· ${o.paymentMethod}</span></p>
+                <p class="text-stone-500">Pickup: ${o.pickupDate}${o.type==='walkup'?' · Walk-up':''}</p>
+                ${o.notes ? `<p class="text-amber-700 mt-0.5">⚠ ${o.notes}</p>` : ''}
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                  ${['pending','paid','ready'].includes(o.status) ? `<button onclick="advanceStatus('${o.id}')" class="text-[10px] bg-teal-800 text-white rounded px-2 py-1 hover:bg-teal-900">Advance →</button>` : ''}
+                  ${o.status === 'ready' && o.phone ? `<button onclick="textCustomer('${o.id}')" class="text-[10px] bg-green-700 text-white rounded px-2 py-1 hover:bg-green-800">📱 Text Ready</button>` : ''}
+                  ${o.status !== 'cancelled' && o.status !== 'picked_up' ? `<button onclick="cancelOrder('${o.id}')" class="text-[10px] text-red-600 px-1.5 py-1 hover:bg-red-50 rounded">Cancel</button>` : ''}
+                  <button onclick="openLabelModal('${o.id}')" class="text-[10px] bg-stone-100 text-stone-700 rounded px-2 py-1 hover:bg-stone-200">🏷 Label</button>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+      content.innerHTML = html;
+    }
+
+    function renderAdminWalkup() {
+      const content = document.getElementById('admin-tab-content');
+      content.innerHTML = `
+        <div class="grid lg:grid-cols-2 gap-5">
+          <div class="bg-white rounded-2xl card-shadow p-5">
+            <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Quick Walk-Up Sale</h2>
+            <p class="text-xs text-stone-500 mb-4">Scan item codes with any phone camera or tap quantities. Stock is shared.</p>
+            <div class="mb-3">
+              <label class="text-sm font-medium">Customer name (optional)</label>
+              <input type="text" id="walkup-name" class="w-full mt-1 rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder="Walk-up or name">
+            </div>
+            <div id="walkup-menu" class="space-y-2 max-h-72 overflow-y-auto border border-stone-100 rounded-xl p-3 mb-3"></div>
+            <div class="flex justify-between font-bold text-lg mb-3"><span>Total</span><span id="walkup-total">$0.00</span></div>
+            <div class="flex gap-2 mb-3">
+              <label class="flex-1 cursor-pointer"><input type="radio" name="walkup-pay" value="cash" class="peer sr-only" checked><div class="border peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2 text-center text-sm font-medium">Cash</div></label>
+              <label class="flex-1 cursor-pointer"><input type="radio" name="walkup-pay" value="cashapp" class="peer sr-only"><div class="border peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2 text-center text-sm font-medium">Cash App</div></label>
+              <label class="flex-1 cursor-pointer"><input type="radio" name="walkup-pay" value="zelle" class="peer sr-only"><div class="border peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2 text-center text-sm font-medium">Zelle</div></label>
+            </div>
+            <button onclick="submitWalkup()" class="w-full bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 rounded-xl">Complete Walk-Up (mark Paid)</button>
+          </div>
+          <div class="bg-white rounded-2xl card-shadow p-5">
+            <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Scan Item Code</h2>
+            <p class="text-xs text-stone-500 mb-3">Use any phone or tablet camera. Point at a printed code or the #E1 style codes on the menu.</p>
+            <div id="reader" class="w-full overflow-hidden rounded-xl bg-stone-100 min-h-[220px] mb-3"></div>
+            <div class="flex gap-2">
+              <button id="start-scan-btn" onclick="startScanner()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl text-sm font-medium">Start Camera</button>
+              <button onclick="stopScanner()" class="flex-1 bg-stone-200 hover:bg-stone-300 py-2.5 rounded-xl text-sm font-medium">Stop</button>
+            </div>
+            <p id="scan-status" class="text-xs text-stone-500 mt-2 text-center">Camera off</p>
+            <div class="mt-4 p-3 bg-stone-50 rounded-lg text-xs">
+              <p class="font-medium mb-1">Item codes (tap to add):</p>
+              <div class="flex flex-wrap gap-1.5">
+                ${state.menu.map(i => `<button onclick="walkupQty('${i.id}',1)" class="font-mono bg-white border px-2 py-1 rounded hover:bg-teal-50">#${i.code} ${i.name.split(' ')[0]}</button>`).join('')}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      window.walkupCart = {};
+      const menuEl = document.getElementById('walkup-menu');
+      menuEl.innerHTML = state.menu.map(item => `
+        <div class="flex items-center justify-between text-sm">
+          <div><p class="font-medium">${item.name}</p><p class="text-xs text-stone-500">$${item.price.toFixed(2)} · ${item.stock} left · #${item.code}</p></div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="walkupQty('${item.id}',-1)" class="w-7 h-7 rounded-full border flex items-center justify-center">−</button>
+            <span id="wq-${item.id}" class="w-5 text-center font-medium">0</span>
+            <button type="button" onclick="walkupQty('${item.id}',1)" class="w-7 h-7 rounded-full border flex items-center justify-center">+</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function walkupQty(id, delta) {
+      const item = state.menu.find(i => i.id === id);
+      if (!item) return;
+      const cur = window.walkupCart[id] || 0;
+      const next = cur + delta;
+      if (next < 0 || next > item.stock) return;
+      if (next === 0) delete window.walkupCart[id]; else window.walkupCart[id] = next;
+      const el = document.getElementById('wq-' + id);
+      if (el) el.textContent = next;
+      let total = 0;
+      Object.keys(window.walkupCart || {}).forEach(k => {
+        const it = state.menu.find(i => i.id === k);
+        total += it.price * window.walkupCart[k];
+      });
+      const totEl = document.getElementById('walkup-total');
+      if (totEl) totEl.textContent = '$' + total.toFixed(2);
+    }
+
+    function submitWalkup() {
+      const ids = Object.keys(window.walkupCart || {});
+      if (!ids.length) { alert('Add at least one item'); return; }
+      const name = (document.getElementById('walkup-name')?.value || '').trim() || 'Walk-up';
+      const payment = document.querySelector('input[name="walkup-pay"]:checked')?.value || 'cash';
+      const items = [];
+      let total = 0;
+      for (const id of ids) {
+        const item = state.menu.find(i => i.id === id);
+        const qty = window.walkupCart[id];
+        if (qty > item.stock) { alert(`Not enough stock for ${item.name}`); return; }
+        items.push({ id, code: item.code, name: item.name, price: item.price, qty });
+        total += item.price * qty;
+        item.stock -= qty;
+      }
+      const order = {
+        id: generateOrderId(), customerName: name, phone: '', type: 'walkup',
+        pickupDate: new Date().toISOString().slice(0,10), items, total,
+        paymentMethod: payment, status: 'paid', notes: '', createdAt: new Date().toISOString()
+      };
+      state.orders.unshift(order);
+      saveState();
+      alert(`Walk-up recorded: $${total.toFixed(2)} — ${name}`);
+      switchAdminTab('walkup');
+      renderAdminStats();
+    }
+
+    function startScanner() {
+      if (typeof Html5Qrcode === 'undefined') {
+        document.getElementById('scan-status').textContent = 'Scanner library failed to load. Use the code buttons instead.';
+        return;
+      }
+      stopScanner();
+      html5QrCode = new Html5Qrcode('reader');
+      Html5Qrcode.getCameras().then(cameras => {
+        if (!cameras || !cameras.length) {
+          document.getElementById('scan-status').textContent = 'No camera found. Use code buttons.';
+          return;
+        }
+        const camId = cameras[cameras.length - 1].id;
+        html5QrCode.start(
+          camId,
+          { fps: 10, qrbox: { width: 220, height: 120 } },
+          (decoded) => {
+            const code = decoded.trim().toUpperCase().replace(/^#/, '');
+            const item = state.menu.find(i => i.code === code || i.id.toUpperCase() === code);
+            if (item) {
+              walkupQty(item.id, 1);
+              document.getElementById('scan-status').textContent = `Added #${item.code} ${item.name}`;
+            } else {
+              document.getElementById('scan-status').textContent = `Unknown code: ${decoded}`;
+            }
+          },
+          () => {}
+        ).then(() => {
+          document.getElementById('scan-status').textContent = 'Camera on — point at a code';
+        }).catch(err => {
+          document.getElementById('scan-status').textContent = 'Camera error: ' + (err?.message || err);
+        });
+      }).catch(() => {
+        document.getElementById('scan-status').textContent = 'Could not access cameras. Use HTTPS or allow permission.';
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrCode) {
+        try { html5QrCode.stop().then(() => html5QrCode.clear()); } catch(e) {}
+        html5QrCode = null;
+      }
+      const st = document.getElementById('scan-status');
+      if (st) st.textContent = 'Camera off';
+    }
+
+    function renderAdminLabels() {
+      const content = document.getElementById('admin-tab-content');
+      const recent = state.orders.filter(o => o.status !== 'cancelled').slice(0, 30);
+      content.innerHTML = `
+        <div class="bg-white rounded-2xl card-shadow p-5">
+          <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Labels for SUPVAN T50M Pro</h2>
+          <p class="text-sm text-stone-500 mb-4">Supports your three tapes: <strong>40×30 mm</strong>, <strong>50×80 mm</strong>, and <strong>Ø50 mm (round)</strong>. Use the Katasymbol app over Bluetooth.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b text-left text-stone-500 text-xs">
+                <th class="pb-2 pr-3">Order</th><th class="pb-2 pr-3">Customer</th><th class="pb-2 pr-3">Items</th><th class="pb-2 pr-3">Total</th><th class="pb-2">Print</th>
+              </tr></thead>
+              <tbody>
+                ${recent.length === 0 ? '<tr><td colspan="5" class="py-6 text-center text-stone-400">No orders yet</td></tr>' :
+                  recent.map(o => `<tr class="border-b border-stone-50">
+                    <td class="py-2.5 pr-3 font-mono text-xs">${o.id}</td>
+                    <td class="py-2.5 pr-3 font-medium">${o.customerName}</td>
+                    <td class="py-2.5 pr-3 text-xs text-stone-600 max-w-[180px] truncate">${o.items.map(i=>`${i.qty}×${i.name.split(' ')[0]}`).join(', ')}</td>
+                    <td class="py-2.5 pr-3">$${o.total.toFixed(2)}</td>
+                    <td class="py-2.5"><button onclick="openLabelModal('${o.id}')" class="text-xs bg-teal-800 text-white px-2.5 py-1.5 rounded-lg hover:bg-teal-900">Label</button></td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-5 p-4 bg-teal-50 rounded-xl text-sm text-teal-900">
+            <p class="font-semibold mb-1">Printing workflow with your SUPVAN T50M Pro</p>
+            <ol class="list-decimal list-inside space-y-1 text-teal-800">
+              <li>Turn on the T50M Pro and open the <strong>Katasymbol</strong> app on your phone.</li>
+              <li>Connect via Bluetooth inside the app.</li>
+              <li>Choose the correct label size (40×30, 50×80, or round Ø50).</li>
+              <li>Click <strong>Label</strong> on an order → Copy Text (or screenshot the preview) → paste / import into Katasymbol → Print.</li>
+            </ol>
+          </div>
+        </div>`;
+    }
+
+    function openLabelModal(orderId) {
+      currentLabelOrder = state.orders.find(o => o.id === orderId);
+      if (!currentLabelOrder) return;
+      setLabelSize(currentLabelSize);
+      document.getElementById('label-modal').classList.remove('hidden');
+    }
+    function closeLabelModal() { document.getElementById('label-modal').classList.add('hidden'); }
+
+    function setLabelSize(size) {
+      currentLabelSize = size;
+      document.querySelectorAll('.label-size-btn').forEach(b => {
+        b.classList.remove('bg-teal-50','border-teal-700');
+        b.classList.add('border-stone-200');
+      });
+      const btn = document.getElementById('ls-' + size);
+      if (btn) { btn.classList.add('bg-teal-50','border-teal-700'); btn.classList.remove('border-stone-200'); }
+
+      const area = document.getElementById('label-print-area');
+      area.className = 'bg-white border border-stone-300 shadow text-center flex flex-col items-center justify-center p-2 overflow-hidden';
+      if (size === '40x30') area.classList.add('label-40x30');
+      else if (size === '50x80') area.classList.add('label-50x80');
+      else area.classList.add('label-round50');
+
+      if (!currentLabelOrder) return;
+      const o = currentLabelOrder;
+      const itemsShort = o.items.map(i => `${i.qty}×${i.name.split(/[\s\/]/)[0]}`).join(' ');
+      let html = '';
+      let plain = '';
+      if (size === '40x30') {
+        html = `<div class="text-[9px] font-bold leading-tight">${o.customerName}</div>
+          <div class="text-[8px] font-mono mt-0.5">${o.id}</div>
+          <div class="text-[8px] mt-0.5 leading-tight">${itemsShort}</div>
+          <div class="text-[9px] font-bold mt-0.5">$${o.total.toFixed(2)}</div>`;
+        plain = `${o.customerName}\n${o.id}\n${itemsShort}\n$${o.total.toFixed(2)}`;
+      } else if (size === '50x80') {
+        html = `<div class="text-[11px] font-bold">${o.customerName}</div>
+          <div class="text-[9px] font-mono text-stone-600">${o.id}</div>
+          <div class="text-[9px] mt-1 text-left w-full px-1">${o.items.map(i=>`${i.qty}× ${i.name}`).join('<br>')}</div>
+          <div class="text-[11px] font-bold mt-1">$${o.total.toFixed(2)} · ${o.paymentMethod}</div>
+          <div class="text-[8px] mt-0.5">Pickup: ${o.pickupDate}</div>
+          ${o.notes ? `<div class="text-[8px] text-red-700 mt-0.5">⚠ ${o.notes}</div>` : ''}`;
+        plain = `${o.customerName}\n${o.id}\n${o.items.map(i=>`${i.qty}× ${i.name}`).join('\n')}\n$${o.total.toFixed(2)} · ${o.paymentMethod}\nPickup: ${o.pickupDate}${o.notes?'\nNotes: '+o.notes:''}`;
+      } else {
+        html = `<div class="text-[10px] font-bold leading-tight px-2">${o.customerName}</div>
+          <div class="text-[8px] font-mono">${o.id.slice(-8)}</div>
+          <div class="text-[9px] font-bold mt-1">$${o.total.toFixed(2)}</div>`;
+        plain = `${o.customerName}\n${o.id}\n$${o.total.toFixed(2)}`;
+      }
+      area.innerHTML = html;
+      document.getElementById('label-text-for-app').value = plain;
+    }
+
+    function copyLabelText() {
+      const ta = document.getElementById('label-text-for-app');
+      ta.select();
+      navigator.clipboard.writeText(ta.value).then(() => alert('Copied! Paste into Katasymbol app.')).catch(() => alert('Select the text and copy manually.'));
+    }
+
+    function renderAdminMenu() {
+      const content = document.getElementById('admin-tab-content');
+      content.innerHTML = `
+        <div class="bg-white rounded-2xl card-shadow p-5">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h2 class="font-display text-lg font-bold text-teal-900">Menu & Inventory</h2>
+              <p class="text-xs text-stone-500">Item codes (E1, S1…) can be scanned in Walk-up. Stock is shared.</p>
+            </div>
+            <button onclick="resetStockToDefault()" class="text-xs text-teal-700 hover:underline">Reset demo stock</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b text-left text-stone-500 text-xs">
+                <th class="pb-2 pr-3">Code</th><th class="pb-2 pr-3">Item</th><th class="pb-2 pr-3">Category</th><th class="pb-2 pr-3">Price</th><th class="pb-2">Stock</th>
+              </tr></thead>
+              <tbody>
+                ${state.menu.map(item => `
+                  <tr class="border-b border-stone-50">
+                    <td class="py-2.5 pr-3 font-mono font-semibold">#${item.code}</td>
+                    <td class="py-2.5 pr-3 font-medium">${item.name}</td>
+                    <td class="py-2.5 pr-3 text-stone-500">${item.category}</td>
+                    <td class="py-2.5 pr-3">$${item.price.toFixed(2)}</td>
+                    <td class="py-2.5"><input type="number" min="0" value="${item.stock}" onchange="updateStock('${item.id}',this.value)" class="w-16 rounded border border-stone-200 px-2 py-1 text-center"></td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+    function updateStock(id, val) {
+      const item = state.menu.find(i => i.id === id);
+      if (item) { item.stock = Math.max(0, parseInt(val,10)||0); saveState(); }
+    }
+    function resetStockToDefault() {
+      if (!confirm('Reset all stock to original quantities?')) return;
+      state.menu = DEFAULT_MENU.map(x => ({...x}));
+      saveState();
+      renderAdminMenu();
+    }
+
+    function renderAdminReports() {
+      const content = document.getElementById('admin-tab-content');
+      const byItem = {};
+      state.orders.filter(o => o.status !== 'cancelled').forEach(o => {
+        o.items.forEach(i => { byItem[i.name] = (byItem[i.name]||0) + i.qty; });
+      });
+      const sorted = Object.entries(byItem).sort((a,b) => b[1]-a[1]);
+      content.innerHTML = `
+        <div class="grid md:grid-cols-2 gap-5">
+          <div class="bg-white rounded-2xl card-shadow p-5">
+            <h2 class="font-display text-lg font-bold text-teal-900 mb-3">Items Sold</h2>
+            ${sorted.length === 0 ? '<p class="text-stone-400 text-sm">No sales yet</p>' :
+              `<ul class="space-y-1.5">${sorted.map(([n,q]) => `<li class="flex justify-between text-sm"><span>${n}</span><span class="font-semibold">${q}</span></li>`).join('')}</ul>`}
+          </div>
+          <div class="bg-white rounded-2xl card-shadow p-5">
+            <h2 class="font-display text-lg font-bold text-teal-900 mb-3">Recent Orders</h2>
+            <ul class="space-y-2 max-h-80 overflow-y-auto text-sm">
+              ${state.orders.slice(0,20).map(o => `
+                <li class="border-b border-stone-50 pb-1.5">
+                  <div class="flex justify-between"><span class="font-medium">${o.customerName}</span><span>$${o.total.toFixed(2)}</span></div>
+                  <div class="text-xs text-stone-500">${o.id} · ${o.status} · ${o.type}</div>
+                </li>`).join('') || '<p class="text-stone-400">None yet</p>'}
+            </ul>
+          </div>
+        </div>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      document.getElementById('sale-date-display').textContent = state.settings.saleDateLabel;
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+      document.getElementById('pickup-date').value = tomorrow.toISOString().slice(0,10);
+      document.getElementById('pickup-date').min = new Date().toISOString().slice(0,10);
+      renderMenu(); renderCart(); updatePaymentDetails();
+      document.querySelectorAll('input[name="payment"]').forEach(r => r.addEventListener('change', updatePaymentDetails));
+    });
+  </script>
+</body>
+</html>
