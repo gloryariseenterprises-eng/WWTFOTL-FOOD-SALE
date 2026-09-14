@@ -112,8 +112,9 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-stone-700 mb-2">Payment Method</label>
-                <div class="grid grid-cols-3 gap-2">
-                  <label class="cursor-pointer"><input type="radio" name="payment" value="cashapp" class="peer sr-only" checked><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash App</div></label>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="cursor-pointer"><input type="radio" name="payment" value="square" class="peer sr-only" checked><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Square</div></label>
+                  <label class="cursor-pointer"><input type="radio" name="payment" value="cashapp" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash App</div></label>
                   <label class="cursor-pointer"><input type="radio" name="payment" value="zelle" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Zelle</div></label>
                   <label class="cursor-pointer"><input type="radio" name="payment" value="cash" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash</div></label>
                 </div>
@@ -148,6 +149,7 @@
           <button onclick="switchAdminTab('labels')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Labels</button>
           <button onclick="switchAdminTab('codes')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Codes</button>
           <button onclick="switchAdminTab('menu')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Menu</button>
+          <button onclick="switchAdminTab('settings')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Settings</button>
           <button onclick="switchAdminTab('reports')" class="admin-tab px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-teal-800">Reports</button>
           <button onclick="logoutAdmin()" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-900/70 ml-1">Logout</button>
         </div>
@@ -233,8 +235,12 @@
       orders: [],
       settings: {
         saleDateLabel: 'Sunday, September 13, 2026',
+        saleDateISO: '2026-09-13',
+        preorderEnabled: true,
         cashAppTag: '$Boardma',
         zelleInfo: 'Send to the ministry Zelle (ask staff for details)',
+        squarePaymentLink: '',
+        squareInstructions: 'Pay with Square using the link or in-person reader. Include your order name in the note.',
         readySmsTemplate: 'Hi {name}! Your WWFL order {id} is READY for pickup. Total ${total}. See you soon! – Women With The Fear Of The Lord'
       }
     };
@@ -378,13 +384,25 @@
     function updatePaymentDetails() {
       const method = document.querySelector('input[name="payment"]:checked')?.value;
       const box = document.getElementById('payment-details');
-      if (method === 'cashapp') {
+      if (!box) return;
+      if (method === 'square') {
+        box.classList.remove('hidden');
+        const link = state.settings.squarePaymentLink || '';
+        const instr = state.settings.squareInstructions || 'Pay with Square. Include your name in the note.';
+        box.innerHTML = `
+          <p class="font-medium text-stone-700 mb-1">Pay with Square</p>
+          <p class="text-sm text-stone-600 mb-2">${instr}</p>
+          ${link ? `<a href="${link}" target="_blank" rel="noopener" class="inline-block bg-[#006AFF] hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Open Square Payment →</a>` : `<p class="text-xs text-amber-700">Staff: add your Square Payment Link in Admin → Settings</p>`}
+          <p class="text-xs text-stone-500 mt-2">Order stays Pending until payment is confirmed.</p>`;
+      } else if (method === 'cashapp') {
         box.classList.remove('hidden');
         box.innerHTML = `<p class="font-medium text-stone-700">Send to Cash App</p><p class="text-teal-800 font-semibold text-lg">${state.settings.cashAppTag}</p><p class="text-xs text-stone-500 mt-0.5">Include your name. Order stays Pending until confirmed.</p>`;
       } else if (method === 'zelle') {
         box.classList.remove('hidden');
         box.innerHTML = `<p class="font-medium text-stone-700">Zelle</p><p class="text-sm text-stone-600">${state.settings.zelleInfo}</p>`;
-      } else box.classList.add('hidden');
+      } else {
+        box.classList.add('hidden');
+      }
     }
 
     function generateOrderId() {
@@ -480,6 +498,7 @@
       else if (tab === 'labels') renderAdminLabels();
       else if (tab === 'codes') renderAdminCodes();
       else if (tab === 'menu') renderAdminMenu();
+      else if (tab === 'settings') renderAdminSettings();
       else if (tab === 'reports') renderAdminReports();
       renderAdminStats();
     }
@@ -594,9 +613,13 @@
               <span id="walkup-total" class="text-2xl font-bold text-teal-900">$0.00</span>
             </div>
 
-            <div class="grid grid-cols-3 gap-2 mb-3">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
               <label class="cursor-pointer">
-                <input type="radio" name="walkup-pay" value="cash" class="peer sr-only" checked>
+                <input type="radio" name="walkup-pay" value="square" class="peer sr-only" checked>
+                <div class="border-2 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-xl py-3 text-center text-sm font-semibold">Square</div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="walkup-pay" value="cash" class="peer sr-only">
                 <div class="border-2 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-xl py-3 text-center text-sm font-semibold">Cash</div>
               </label>
               <label class="cursor-pointer">
@@ -1104,6 +1127,106 @@
       renderAdminMenu();
     }
 
+    function renderAdminSettings() {
+      const s = state.settings;
+      const content = document.getElementById('admin-tab-content');
+      content.innerHTML = `
+        <div class="max-w-xl bg-white rounded-2xl card-shadow p-6 space-y-6">
+          <div>
+            <h2 class="font-display text-lg font-bold text-teal-900">Event Settings</h2>
+            <p class="text-sm text-stone-500">Control the sale date and whether customers can pre-order.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-stone-700 mb-1">Event date (shown to customers)</label>
+            <input type="text" id="set-sale-label" value="${(s.saleDateLabel || '').replace(/"/g, '&quot;')}"
+              class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm"
+              placeholder="e.g. Sunday, October 12, 2026">
+            <p class="text-xs text-stone-400 mt-1">This is the text that appears under the title on the public page.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-stone-700 mb-1">Event calendar date</label>
+            <input type="date" id="set-sale-iso" value="${s.saleDateISO || ''}"
+              class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
+            <p class="text-xs text-stone-400 mt-1">Used for reference and default pickup suggestions.</p>
+          </div>
+
+          <div class="flex items-center justify-between gap-4 p-4 rounded-xl border border-stone-200 bg-stone-50">
+            <div>
+              <p class="font-medium text-stone-800">Allow Pre-Ordering</p>
+              <p class="text-xs text-stone-500 mt-0.5">When off, customers only see Walk-Up / Same Day.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="set-preorder" class="sr-only peer" ${s.preorderEnabled !== false ? 'checked' : ''}>
+              <div class="w-12 h-7 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:bg-teal-700 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:after:translate-x-5"></div>
+            </label>
+          </div>
+
+          <div class="border-t border-stone-100 pt-5">
+            <p class="font-semibold text-stone-800 mb-3">Square payments</p>
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-stone-700 mb-1">Square Payment Link</label>
+              <input type="url" id="set-square-link" value="${(s.squarePaymentLink || '').replace(/"/g, '&quot;')}"
+                class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="https://square.link/u/...">
+              <p class="text-xs text-stone-400 mt-1">Create a Payment Link in your Square Dashboard and paste it here.</p>
+            </div>
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-stone-700 mb-1">Square instructions (shown to customer)</label>
+              <input type="text" id="set-square-instr" value="${(s.squareInstructions || '').replace(/"/g, '&quot;')}"
+                class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="Pay with Square. Include your name in the note.">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-stone-700 mb-1">Cash App tag</label>
+            <input type="text" id="set-cashapp" value="${(s.cashAppTag || '').replace(/"/g, '&quot;')}"
+              class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="$YourTag">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-stone-700 mb-1">Zelle instructions</label>
+            <input type="text" id="set-zelle" value="${(s.zelleInfo || '').replace(/"/g, '&quot;')}"
+              class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
+          </div>
+
+          <button onclick="saveAdminSettings()" class="w-full bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 rounded-xl">
+            Save Settings
+          </button>
+          <p id="settings-saved-msg" class="text-center text-sm text-green-600 hidden">Settings saved.</p>
+        </div>
+      `;
+    }
+
+    function saveAdminSettings() {
+      const label = document.getElementById('set-sale-label')?.value?.trim() || state.settings.saleDateLabel;
+      const iso = document.getElementById('set-sale-iso')?.value || state.settings.saleDateISO;
+      const preorder = document.getElementById('set-preorder')?.checked ?? true;
+      const cashapp = document.getElementById('set-cashapp')?.value?.trim() || state.settings.cashAppTag;
+      const zelle = document.getElementById('set-zelle')?.value?.trim() || state.settings.zelleInfo;
+      const squareLink = document.getElementById('set-square-link')?.value?.trim() || '';
+      const squareInstr = document.getElementById('set-square-instr')?.value?.trim() || state.settings.squareInstructions;
+
+      state.settings.saleDateLabel = label;
+      state.settings.saleDateISO = iso;
+      state.settings.preorderEnabled = preorder;
+      state.settings.cashAppTag = cashapp;
+      state.settings.zelleInfo = zelle;
+      state.settings.squarePaymentLink = squareLink;
+      state.settings.squareInstructions = squareInstr;
+      saveState();
+
+      // Update public view immediately if visible
+      const dateDisplay = document.getElementById('sale-date-display');
+      if (dateDisplay) dateDisplay.textContent = label;
+
+      const msg = document.getElementById('settings-saved-msg');
+      if (msg) {
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 2000);
+      }
+    }
+
     function renderAdminReports() {
       const content = document.getElementById('admin-tab-content');
       const byItem = {};
@@ -1133,13 +1256,37 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       loadState();
-      document.getElementById('sale-date-display').textContent = state.settings.saleDateLabel;
+      // Ensure new settings keys exist for older saved data
+      if (state.settings.preorderEnabled === undefined) state.settings.preorderEnabled = true;
+      if (!state.settings.saleDateISO) state.settings.saleDateISO = '2026-09-13';
+      applyPublicSettings();
       const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-      document.getElementById('pickup-date').value = tomorrow.toISOString().slice(0,10);
-      document.getElementById('pickup-date').min = new Date().toISOString().slice(0,10);
+      const dateInp = document.getElementById('pickup-date');
+      if (dateInp) {
+        dateInp.value = tomorrow.toISOString().slice(0,10);
+        dateInp.min = new Date().toISOString().slice(0,10);
+      }
       renderMenu(); renderCart(); updatePaymentDetails();
       document.querySelectorAll('input[name="payment"]').forEach(r => r.addEventListener('change', updatePaymentDetails));
     });
+
+    function applyPublicSettings() {
+      const label = document.getElementById('sale-date-display');
+      if (label) label.textContent = state.settings.saleDateLabel || '';
+      const preorderBtn = document.getElementById('btn-preorder');
+      const walkupBtn = document.getElementById('btn-walkup');
+      const toggleWrap = preorderBtn ? preorderBtn.parentElement : null;
+      if (state.settings.preorderEnabled === false) {
+        // Force walk-up only
+        if (preorderBtn) preorderBtn.classList.add('hidden');
+        setOrderMode('walkup');
+        if (walkupBtn) {
+          walkupBtn.className = 'px-5 py-2.5 rounded-lg text-sm font-semibold bg-teal-800 text-white transition';
+        }
+      } else {
+        if (preorderBtn) preorderBtn.classList.remove('hidden');
+      }
+    }
   </script>
 </body>
 </html>
