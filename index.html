@@ -298,10 +298,18 @@
       }
     }
     function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        menu: state.menu, orders: state.orders, settings: state.settings
-      }));
-    }
+  const payload = {
+    menu: state.menu,
+    orders: state.orders,
+    settings: state.settings
+  };
+  try {
+    localStorage.setItem('wwfl_state', JSON.stringify(payload));
+  } catch (e) {}
+  if (typeof db !== 'undefined') {
+    db.ref('app').set(payload).catch(err => console.warn('Firebase save', err));
+  }
+}
 
     function setOrderMode(mode) {
       state.orderMode = mode;
