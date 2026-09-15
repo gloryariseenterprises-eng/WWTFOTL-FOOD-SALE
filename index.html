@@ -280,23 +280,47 @@
       { id: 'des2', code: 'D2', name: 'Cakes/Cupcake', category: 'Desserts', price: 5, stock: 6 },
       { id: 'des3', code: 'D3', name: 'Meat Pie', category: 'Desserts', price: 5, stock: 12 }
     ];
-
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const p = JSON.parse(raw);
-          state.menu = p.menu || DEFAULT_MENU.map(x => ({...x}));
-          state.orders = p.orders || [];
-          state.settings = { ...state.settings, ...(p.settings || {}) };
-        } else {
-          state.menu = DEFAULT_MENU.map(x => ({...x}));
-          saveState();
-        }
-      } catch(e) {
-        state.menu = DEFAULT_MENU.map(x => ({...x}));
-      }
+function loadState() {
+  // First load from localStorage for instant display
+  try {
+    const raw = localStorage.getItem('wwfl_state');
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p.menu) state.menu = p.menu;
+      if (p.orders) state.orders = p.orders;
+      if (p.settings) state.settings = { ...state.settings, ...p.settings };
     }
+  } catch (e) {}
+
+  // Then sync from Firebase (shared across all phones)
+  if (typeof db === 'undefined') return;
+  db.ref('app').on('value', snap => {
+    const p = snap.val();
+    if (!p) {
+      // First time: push current state up
+      saveState();
+      return;
+    }
+    if (p.menu) state.menu = p.menu;
+    if (p.orders) state.orders = p.orders;
+    if (p.settings) state.settings = { ...state.settings, ...p.settings };
+    try {
+      localStorage.setItem('wwfl_state', JSON.stringify({
+        menu: state.menu,
+        orders: state.orders,
+        settings: state.settings
+      }));
+    } catch (e) {}
+    // Refresh screens if open
+    if (document.getElementById('admin-view') && !document.getElementById('admin-view').classList.contains('hidden')) {
+      renderAdminStats();
+      const active = document.querySelector('.admin-tab.bg-teal-700');
+      if (active) active.click();
+    }
+    if (typeof renderMenu === 'function') renderMenu();
+    if (typeof renderCart === 'function') renderCart();
+  });
+}
     function saveState() {
   const payload = {
     menu: state.menu,
