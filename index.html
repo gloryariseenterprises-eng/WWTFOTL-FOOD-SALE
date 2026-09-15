@@ -1,8 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Women With The Fear Of The Lord — Monthly Food Sale</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
   <script>
@@ -18,12 +22,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
   </script>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Women With The Fear Of The Lord — Monthly Food Sale</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -261,7 +260,12 @@
         zelleInfo: 'Send to the ministry Zelle (ask staff for details)',
         squarePaymentLink: '',
         squareInstructions: 'Pay with Square using the link or in-person reader. Include your order name in the note.',
-        readySmsTemplate: 'Hi {name}! Your WWFL order {id} is READY for pickup. Total ${total}. See you soon! – Women With The Fear Of The Lord'
+        readySmsTemplate: 'Hi {name}! Your WWFL order {id} is READY for pickup. Total ${total}. See you soon! – Women With The Fear Of The Lord',
+        notifyEmail: '',
+        emailjsPublicKey: '',
+        emailjsServiceId: '',
+        emailjsTemplateId: '',
+        adminSoundEnabled: true
       }
     };
 
@@ -280,60 +284,191 @@
       { id: 'des2', code: 'D2', name: 'Cakes/Cupcake', category: 'Desserts', price: 5, stock: 6 },
       { id: 'des3', code: 'D3', name: 'Meat Pie', category: 'Desserts', price: 5, stock: 12 }
     ];
-function loadState() {
-  // First load from localStorage for instant display
-  try {
-    const raw = localStorage.getItem('wwfl_state');
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (p.menu) state.menu = p.menu;
-      if (p.orders) state.orders = p.orders;
-      if (p.settings) state.settings = { ...state.settings, ...p.settings };
-    }
-  } catch (e) {}
 
-  // Then sync from Firebase (shared across all phones)
-  if (typeof db === 'undefined') return;
-  db.ref('app').on('value', snap => {
-    const p = snap.val();
-    if (!p) {
-      // First time: push current state up
-      saveState();
-      return;
+    let _firebaseReady = false;
+    let _skipNextFirebaseWrite = false;
+
+    function applyPayload(p) {
+      if (!p) return;
+      if (p.menu && Array.isArray(p.menu)) state.menu = p.menu;
+      if (p.orders && Array.isArray(p.orders)) state.orders = p.orders;
+      if (p.settings && typeof p.settings === 'object') {
+        state.settings = { ...state.settings, ...p.settings };
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          menu: state.menu, orders: state.orders, settings: state.settings
+        }));
+      } catch (e) {}
     }
-    if (p.menu) state.menu = p.menu;
-    if (p.orders) state.orders = p.orders;
-    if (p.settings) state.settings = { ...state.settings, ...p.settings };
-    try {
-      localStorage.setItem('wwfl_state', JSON.stringify({
+
+    function refreshUIFromState() {
+      try {
+        if (typeof applyPublicSettings === 'function') applyPublicSettings();
+        if (typeof renderMenu === 'function') renderMenu();
+        if (typeof renderCart === 'function') renderCart();
+        const adminView = document.getElementById('admin-view');
+        if (adminView && !adminView.classList.contains('hidden')) {
+          if (typeof renderAdminStats === 'function') renderAdminStats();
+          const activeBtn = document.querySelector('.admin-tab.bg-teal-700, .admin-tab.bg-teal-800');
+          if (activeBtn && activeBtn.getAttribute('onclick')) {
+            // re-click current tab to refresh content
+            const m = activeBtn.getAttribute('onclick').match(/switchAdminTab\('([^']+)'\)/);
+            if (m && typeof switchAdminTab === 'function') switchAdminTab(m[1]);
+          }
+        }
+      } catch (e) { console.warn('refreshUI', e); }
+    }
+
+    function loadState() {
+      // Local first for fast paint
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          applyPayload(JSON.parse(raw));
+        } else {
+          state.menu = DEFAULT_MENU.map(x => ({...x}));
+        }
+      } catch (e) {
+        state.menu = DEFAULT_MENU.map(x => ({...x}));
+      }
+      if (!state.menu || !state.menu.length) {
+        state.menu = DEFAULT_MENU.map(x => ({...x}));
+      }
+
+      // Shared cloud sync
+      if (typeof db === 'undefined') {
+        console.warn('Firebase not loaded — using local only');
+        return;
+      }
+      db.ref('app').on('value', function(snap) {
+        const p = snap.val();
+        if (!p) {
+          // Seed database with current state once
+          _firebaseReady = true;
+          saveState();
+          return;
+        }
+        const prevIds = new Set((state.orders || []).map(o => o.id));
+        _skipNextFirebaseWrite = true;
+        applyPayload(p);
+        _firebaseReady = true;
+        // Detect newly arrived orders (from other devices)
+        if (prevIds.size >= 0 && state.orders && state.orders.length) {
+          const newcomers = state.orders.filter(o => o.id && !prevIds.has(o.id));
+          if (newcomers.length && prevIds.size > 0) {
+            newcomers.forEach(function(o) { notifyNewOrder(o); });
+          }
+        }
+        refreshUIFromState();
+        setTimeout(function() { _skipNextFirebaseWrite = false; }, 300);
+      }, function(err) {
+        console.warn('Firebase read error', err);
+        _firebaseReady = true;
+      });
+    }
+
+    function saveState() {
+      const payload = {
         menu: state.menu,
         orders: state.orders,
         settings: state.settings
-      }));
-    } catch (e) {}
-    // Refresh screens if open
-    if (document.getElementById('admin-view') && !document.getElementById('admin-view').classList.contains('hidden')) {
-      renderAdminStats();
-      const active = document.querySelector('.admin-tab.bg-teal-700');
-      if (active) active.click();
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {}
+      if (typeof db === 'undefined') return;
+      if (_skipNextFirebaseWrite) return;
+      db.ref('app').set(payload).catch(function(err) {
+        console.warn('Firebase save error', err);
+      });
     }
-    if (typeof renderMenu === 'function') renderMenu();
-    if (typeof renderCart === 'function') renderCart();
-  });
-}
-    function saveState() {
-  const payload = {
-    menu: state.menu,
-    orders: state.orders,
-    settings: state.settings
-  };
-  try {
-    localStorage.setItem('wwfl_state', JSON.stringify(payload));
-  } catch (e) {}
-  if (typeof db !== 'undefined') {
-    db.ref('app').set(payload).catch(err => console.warn('Firebase save', err));
-  }
-}
+
+    let _audioCtx = null;
+    function playOrderSound() {
+      if (state.settings.adminSoundEnabled === false) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!_audioCtx) _audioCtx = new AudioCtx();
+        if (_audioCtx.state === 'suspended') _audioCtx.resume();
+        const now = _audioCtx.currentTime;
+        [0, 0.15, 0.3].forEach(function(delay, i) {
+          const osc = _audioCtx.createOscillator();
+          const gain = _audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = i === 2 ? 880 : 660;
+          gain.gain.setValueAtTime(0.0001, now + delay);
+          gain.gain.exponentialRampToValueAtTime(0.25, now + delay + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.12);
+          osc.connect(gain);
+          gain.connect(_audioCtx.destination);
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.15);
+        });
+      } catch (e) { console.warn('sound', e); }
+    }
+
+    function showOrderBanner(order) {
+      let banner = document.getElementById('new-order-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'new-order-banner';
+        banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;max-width:92vw;background:#134e4a;color:#fff;padding:12px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px;font-weight:600;display:none;';
+        document.body.appendChild(banner);
+      }
+      const name = (order && order.customerName) || 'Customer';
+      const total = order && order.total != null ? '$' + Number(order.total).toFixed(2) : '';
+      banner.textContent = 'New order: ' + name + (total ? ' · ' + total : '');
+      banner.style.display = 'block';
+      clearTimeout(banner._hideTimer);
+      banner._hideTimer = setTimeout(function() { banner.style.display = 'none'; }, 6000);
+    }
+
+    function sendOrderEmail(order) {
+      const s = state.settings || {};
+      if (!s.notifyEmail || !s.emailjsPublicKey || !s.emailjsServiceId || !s.emailjsTemplateId) return;
+      if (typeof emailjs === 'undefined') return;
+      try {
+        emailjs.init({ publicKey: s.emailjsPublicKey });
+        const items = (order.items || []).map(i => i.qty + 'x ' + i.name).join(', ');
+        emailjs.send(s.emailjsServiceId, s.emailjsTemplateId, {
+          to_email: s.notifyEmail,
+          order_id: order.id || '',
+          customer_name: order.customerName || '',
+          phone: order.phone || '',
+          type: order.type || '',
+          pickup_date: order.pickupDate || '',
+          payment: order.paymentMethod || '',
+          items: items,
+          total: order.total != null ? Number(order.total).toFixed(2) : '',
+          notes: order.notes || '',
+          status: order.status || 'pending'
+        }).then(function() {
+          console.log('Order email sent');
+        }).catch(function(err) {
+          console.warn('EmailJS error', err);
+        });
+      } catch (e) {
+        console.warn('Email send failed', e);
+      }
+    }
+
+    function notifyNewOrder(order) {
+      if (!order || !order.id) return;
+      const key = 'wwfl_notified_' + order.id;
+      const already = sessionStorage.getItem(key);
+      const adminView = document.getElementById('admin-view');
+      const adminOpen = adminView && !adminView.classList.contains('hidden');
+      if (adminOpen) {
+        playOrderSound();
+        showOrderBanner(order);
+      }
+      if (!already) {
+        sessionStorage.setItem(key, '1');
+        sendOrderEmail(order);
+      }
+    }
 
     function setOrderMode(mode) {
       state.orderMode = mode;
@@ -787,6 +922,8 @@ function loadState() {
       };
       state.orders.unshift(order);
       saveState();
+      notifyNewOrder(order);
+      notifyNewOrder(order);
       alert(`Walk-up recorded: $${total.toFixed(2)} — ${name}`);
       switchAdminTab('walkup');
       renderAdminStats();
@@ -1475,8 +1612,91 @@ function loadState() {
             Save Settings
           </button>
           <p id="settings-saved-msg" class="text-center text-sm text-green-600 hidden">Settings saved.</p>
+
+          <div class="border-t border-stone-100 pt-5">
+            <p class="font-semibold text-stone-800 mb-1">Order alerts</p>
+            <p class="text-xs text-stone-500 mb-3">Sound plays when Admin is open. Email needs a free EmailJS account (see instructions below).</p>
+            <label class="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl border border-stone-200 bg-stone-50">
+              <span class="text-sm font-medium text-stone-800">Admin sound + banner</span>
+              <input type="checkbox" id="set-admin-sound" class="w-5 h-5" ${s.adminSoundEnabled !== false ? 'checked' : ''}>
+            </label>
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-stone-700 mb-1">Email for new orders</label>
+              <input type="email" id="set-notify-email" value="${(s.notifyEmail || '').replace(/"/g, '&quot;')}"
+                class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm" placeholder="you@example.com">
+            </div>
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-stone-700 mb-1">EmailJS Public Key</label>
+              <input type="text" id="set-emailjs-key" value="${(s.emailjsPublicKey || '').replace(/"/g, '&quot;')}"
+                class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm font-mono text-xs" placeholder="Your EmailJS public key">
+            </div>
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-stone-700 mb-1">EmailJS Service ID</label>
+              <input type="text" id="set-emailjs-service" value="${(s.emailjsServiceId || '').replace(/"/g, '&quot;')}"
+                class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm font-mono text-xs" placeholder="service_xxxxx">
+            </div>
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-stone-700 mb-1">EmailJS Template ID</label>
+              <input type="text" id="set-emailjs-template" value="${(s.emailjsTemplateId || '').replace(/"/g, '&quot;')}"
+                class="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm font-mono text-xs" placeholder="template_xxxxx">
+            </div>
+            <p class="text-xs text-stone-400 mb-1">Template variables: to_email, order_id, customer_name, phone, type, pickup_date, payment, items, total, notes, status</p>
+          </div>
+
+          <div class="border-t-2 border-amber-200 pt-5 mt-2">
+            <p class="font-semibold text-stone-800 mb-1">New month / reset sale</p>
+            <p class="text-xs text-stone-500 mb-3">Use after a sale is finished, before the next month. This affects all devices.</p>
+            <label class="flex items-start gap-2 mb-2 text-sm">
+              <input type="checkbox" id="reset-clear-orders" class="mt-1" checked>
+              <span>Clear all orders (Pending, Paid, Ready, Picked up)</span>
+            </label>
+            <label class="flex items-start gap-2 mb-3 text-sm">
+              <input type="checkbox" id="reset-stock" class="mt-1" checked>
+              <span>Reset stock quantities to the original demo numbers</span>
+            </label>
+            <p class="text-xs text-stone-400 mb-3">Menu names, prices, and codes are kept. Settings (date, Square, etc.) are kept.</p>
+            <button type="button" onclick="resetForNewMonth()" class="w-full bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 rounded-xl">
+              Start new month
+            </button>
+            <p id="reset-month-msg" class="text-center text-sm text-green-600 hidden mt-2">Sale reset for new month.</p>
+          </div>
         </div>
       `;
+    }
+
+    function resetForNewMonth() {
+      const clearOrders = document.getElementById('reset-clear-orders')?.checked;
+      const resetStock = document.getElementById('reset-stock')?.checked;
+      if (!clearOrders && !resetStock) {
+        alert('Check at least one option.');
+        return;
+      }
+      const parts = [];
+      if (clearOrders) parts.push('clear ALL orders');
+      if (resetStock) parts.push('reset stock quantities');
+      if (!confirm('Start new month?\n\nThis will: ' + parts.join(' and ') + '.\n\nThis cannot be undone.')) return;
+
+      if (clearOrders) {
+        state.orders = [];
+      }
+      if (resetStock) {
+        const defaults = {
+          ent1: 29, ent2: 18, ent3: 15, ent4: 20, ent5: 12,
+          sal1: 3, des1: 12, des2: 6, des3: 12
+        };
+        state.menu.forEach(item => {
+          if (defaults[item.id] !== undefined) item.stock = defaults[item.id];
+          else item.stock = 20;
+        });
+      }
+      saveState();
+      if (typeof renderAdminStats === 'function') renderAdminStats();
+      const msg = document.getElementById('reset-month-msg');
+      if (msg) {
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+      }
+      alert('New month started. All devices will update shortly.');
     }
 
     function saveAdminSettings() {
@@ -1487,6 +1707,11 @@ function loadState() {
       const zelle = document.getElementById('set-zelle')?.value?.trim() || state.settings.zelleInfo;
       const squareLink = document.getElementById('set-square-link')?.value?.trim() || '';
       const squareInstr = document.getElementById('set-square-instr')?.value?.trim() || state.settings.squareInstructions;
+      const notifyEmail = document.getElementById('set-notify-email')?.value?.trim() || '';
+      const emailjsKey = document.getElementById('set-emailjs-key')?.value?.trim() || '';
+      const emailjsService = document.getElementById('set-emailjs-service')?.value?.trim() || '';
+      const emailjsTemplate = document.getElementById('set-emailjs-template')?.value?.trim() || '';
+      const adminSound = document.getElementById('set-admin-sound')?.checked ?? true;
 
       state.settings.saleDateLabel = label;
       state.settings.saleDateISO = iso;
@@ -1495,6 +1720,11 @@ function loadState() {
       state.settings.zelleInfo = zelle;
       state.settings.squarePaymentLink = squareLink;
       state.settings.squareInstructions = squareInstr;
+      state.settings.notifyEmail = notifyEmail;
+      state.settings.emailjsPublicKey = emailjsKey;
+      state.settings.emailjsServiceId = emailjsService;
+      state.settings.emailjsTemplateId = emailjsTemplate;
+      state.settings.adminSoundEnabled = adminSound;
       saveState();
 
       // Update public view immediately if visible
