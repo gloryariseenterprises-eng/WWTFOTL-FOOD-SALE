@@ -754,10 +754,21 @@
       html5QrCode = new Html5Qrcode('reader');
       document.getElementById('scan-status').textContent = 'Starting camera… allow permission if asked';
 
+      // Prevent rapid double-counts from the same QR staying in view
+      if (typeof window._scanLockUntil === 'undefined') window._scanLockUntil = 0;
+      if (typeof window._lastScanCode === 'undefined') window._lastScanCode = '';
+
       const onSuccess = (decoded) => {
+        const now = Date.now();
         const raw = (decoded || '').trim();
         const code = raw.toUpperCase().replace(/^#/, '').replace(/\s/g, '');
-        // Match code, #code, or full id
+        if (!code) return;
+
+        // Ignore scans during cooldown (2 seconds) — stops multi-count
+        if (now < window._scanLockUntil) {
+          return;
+        }
+
         const item = state.menu.find(i =>
           i.code === code ||
           i.code.toUpperCase() === code ||
@@ -765,12 +776,21 @@
           ('#' + i.code) === raw.toUpperCase()
         );
         if (item) {
+          window._scanLockUntil = now + 2000; // 2 second lock
+          window._lastScanCode = code;
           walkupQty(item.id, 1);
           const st = document.getElementById('scan-status');
-          st.textContent = '✓ Added #' + item.code + ' — ' + item.name;
+          st.textContent = '✓ Added #' + item.code + ' — ' + item.name + ' (wait a moment to scan again)';
           st.className = 'text-xs text-center mt-2 font-medium text-green-600';
-          setTimeout(() => { st.className = 'text-xs text-center mt-2 font-medium text-stone-500'; }, 1200);
+          setTimeout(() => {
+            if (st) {
+              st.textContent = 'Ready to scan next item';
+              st.className = 'text-xs text-center mt-2 font-medium text-stone-500';
+            }
+          }, 2000);
         } else {
+          // Short lock on unknown codes too so it does not spam
+          window._scanLockUntil = now + 800;
           document.getElementById('scan-status').textContent = 'Unknown code: ' + raw + ' (try typing it below)';
         }
       };
