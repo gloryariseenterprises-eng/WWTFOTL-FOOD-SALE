@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCv8nJ3OwLC97kjh7Ni3Pj_T78wG5Mvj2c",
+      authDomain: "wwtfotl-food-sale.firebaseapp.com",
+      databaseURL: "https://wwtfotl-food-sale-default-rtdb.firebaseio.com",
+      projectId: "wwtfotl-food-sale",
+      storageBucket: "wwtfotl-food-sale.firebasestorage.app",
+      messagingSenderId: "634598776598",
+      appId: "1:634598776598:web:c9b0a67154789b5e023a37"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Women With The Fear Of The Lord — Monthly Food Sale</title>
