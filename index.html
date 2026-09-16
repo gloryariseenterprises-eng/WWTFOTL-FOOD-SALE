@@ -658,25 +658,57 @@
       setTimeout(() => document.getElementById('admin-password').focus(), 80);
     }
     function hideAdminLogin() { document.getElementById('admin-login-modal').classList.add('hidden'); }
+    function enterAdminView() {
+      hideAdminLogin();
+      document.getElementById('customer-view').classList.add('hidden');
+      document.getElementById('admin-view').classList.remove('hidden');
+      try {
+        sessionStorage.setItem('wwfl_admin', '1');
+        if (location.hash !== '#admin') {
+          history.replaceState(null, '', location.pathname + location.search + '#admin');
+        }
+      } catch (e) {}
+      switchAdminTab(window._currentAdminTab || 'orders');
+    }
     function attemptAdminLogin() {
       if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
-        hideAdminLogin();
-        document.getElementById('customer-view').classList.add('hidden');
-        document.getElementById('admin-view').classList.remove('hidden');
-        switchAdminTab('orders');
+        enterAdminView();
       } else document.getElementById('login-error').classList.remove('hidden');
     }
     function logoutAdmin() {
       stopScanner();
+      try {
+        sessionStorage.removeItem('wwfl_admin');
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) {}
       document.getElementById('admin-view').classList.add('hidden');
       document.getElementById('customer-view').classList.remove('hidden');
       renderMenu(); renderCart();
     }
+    function tryRestoreAdminSession() {
+      try {
+        const wantAdmin = location.hash === '#admin' || new URLSearchParams(location.search).get('staff') === '1';
+        const loggedIn = sessionStorage.getItem('wwfl_admin') === '1';
+        if (wantAdmin && loggedIn) {
+          enterAdminView();
+          return true;
+        }
+        if (wantAdmin && !loggedIn) {
+          showAdminLogin();
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
 
     function switchAdminTab(tab) {
+      window._currentAdminTab = tab;
       document.querySelectorAll('.admin-tab').forEach(b => {
-        b.classList.remove('bg-teal-700');
-        b.classList.add('hover:bg-teal-800');
+        b.className = 'admin-tab px-3 py-1.5 rounded-lg text-sm font-medium text-teal-100 hover:bg-teal-800/80';
+        const oc = b.getAttribute('onclick') || '';
+        if (oc.indexOf("'" + tab + "'") !== -1) {
+          b.className = 'admin-tab px-3 py-1.5 rounded-lg text-sm font-bold bg-white text-teal-900 shadow';
+        }
       });
       stopScanner();
       if (tab === 'orders') renderAdminOrders();
@@ -1772,13 +1804,8 @@
       if (state.settings.preorderEnabled === undefined) state.settings.preorderEnabled = true;
       if (!state.settings.saleDateISO) state.settings.saleDateISO = '2026-09-13';
       applyPublicSettings();
-      // Staff shortcut: #admin or ?staff=1 opens login (not shown on public page)
-      try {
-        const params = new URLSearchParams(location.search);
-        if (location.hash === '#admin' || params.get('staff') === '1') {
-          setTimeout(function() { if (typeof showAdminLogin === 'function') showAdminLogin(); }, 400);
-        }
-      } catch (e) {}
+      // Bookmarkable admin: #admin restores session or asks for password
+      setTimeout(function() { tryRestoreAdminSession(); }, 300);
       const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
       const dateInp = document.getElementById('pickup-date');
       if (dateInp) {
