@@ -864,13 +864,20 @@
           <div class="lg:col-span-2 space-y-3">
             <div class="bg-white rounded-2xl card-shadow p-4">
               <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Scan Code</h2>
-              <p class="text-xs text-stone-500 mb-2">Point camera at the printed QR code</p>
+              <p class="text-xs text-stone-500 mb-2">Scan detects the code — you must tap <strong>Add</strong> to count it</p>
               <div id="reader" class="w-full overflow-hidden rounded-xl bg-stone-900 min-h-[200px] mb-2"></div>
               <div class="flex gap-2 mb-2">
                 <button id="start-scan-btn" onclick="startScanner()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl text-sm font-bold">▶ Start Camera</button>
                 <button onclick="stopScanner()" class="flex-1 bg-stone-200 hover:bg-stone-300 py-3 rounded-xl text-sm font-bold">Stop</button>
               </div>
-              <p id="scan-status" class="text-xs text-center mb-3 font-medium text-stone-500">Camera off</p>
+              <p id="scan-status" class="text-xs text-center mb-2 font-medium text-stone-500">Camera off</p>
+              <div id="scan-confirm-box" class="hidden mb-3 p-3 rounded-xl border-2 border-teal-600 bg-teal-50">
+                <p class="text-sm font-semibold text-teal-900 mb-1" id="scan-confirm-label">Detected</p>
+                <div class="flex gap-2">
+                  <button type="button" onclick="confirmPendingScan()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl text-sm font-bold">✓ Add item</button>
+                  <button type="button" onclick="clearPendingScan()" class="flex-1 bg-stone-200 hover:bg-stone-300 py-3 rounded-xl text-sm font-bold">Ignore</button>
+                </div>
+              </div>
               <div class="flex gap-2">
                 <input id="manual-code-input" type="text" placeholder="Or type code e.g. E1" 
                   class="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm font-mono uppercase"
@@ -972,20 +979,19 @@
       html5QrCode = new Html5Qrcode('reader');
       document.getElementById('scan-status').textContent = 'Starting camera… allow permission if asked';
 
-      // Prevent rapid double-counts from the same QR staying in view
+      // Detect only — do not auto-add. Staff must tap "Add item".
+      if (typeof window._pendingScanItemId === 'undefined') window._pendingScanItemId = null;
       if (typeof window._scanLockUntil === 'undefined') window._scanLockUntil = 0;
-      if (typeof window._lastScanCode === 'undefined') window._lastScanCode = '';
 
       const onSuccess = (decoded) => {
         const now = Date.now();
+        if (now < window._scanLockUntil) return;
+        // If already waiting for confirm, ignore further detections
+        if (window._pendingScanItemId) return;
+
         const raw = (decoded || '').trim();
         const code = raw.toUpperCase().replace(/^#/, '').replace(/\s/g, '');
         if (!code) return;
-
-        // Ignore scans during cooldown (2 seconds) — stops multi-count
-        if (now < window._scanLockUntil) {
-          return;
-        }
 
         const item = state.menu.find(i =>
           i.code === code ||
@@ -994,22 +1000,21 @@
           ('#' + i.code) === raw.toUpperCase()
         );
         if (item) {
-          window._scanLockUntil = now + 2000; // 2 second lock
-          window._lastScanCode = code;
-          walkupQty(item.id, 1);
+          window._pendingScanItemId = item.id;
+          window._scanLockUntil = now + 1500;
+          const box = document.getElementById('scan-confirm-box');
+          const label = document.getElementById('scan-confirm-label');
+          if (label) label.textContent = 'Detected #' + item.code + ' — ' + item.name + ' ($' + item.price.toFixed(2) + ')';
+          if (box) box.classList.remove('hidden');
           const st = document.getElementById('scan-status');
-          st.textContent = '✓ Added #' + item.code + ' — ' + item.name + ' (wait a moment to scan again)';
-          st.className = 'text-xs text-center mt-2 font-medium text-green-600';
-          setTimeout(() => {
-            if (st) {
-              st.textContent = 'Ready to scan next item';
-              st.className = 'text-xs text-center mt-2 font-medium text-stone-500';
-            }
-          }, 2000);
+          if (st) {
+            st.textContent = 'Confirm below — nothing added yet';
+            st.className = 'text-xs text-center mb-2 font-medium text-amber-700';
+          }
         } else {
-          // Short lock on unknown codes too so it does not spam
-          window._scanLockUntil = now + 800;
-          document.getElementById('scan-status').textContent = 'Unknown code: ' + raw + ' (try typing it below)';
+          window._scanLockUntil = now + 1000;
+          const st = document.getElementById('scan-status');
+          if (st) st.textContent = 'Unknown code: ' + raw;
         }
       };
 
@@ -1053,6 +1058,31 @@
           document.getElementById('scan-status').textContent = 'Camera permission denied. Use + buttons or type code below.';
         });
       });
+    }
+
+    function confirmPendingScan() {
+      const id = window._pendingScanItemId;
+      if (!id) return;
+      walkupQty(id, 1);
+      const item = state.menu.find(i => i.id === id);
+      clearPendingScan();
+      const st = document.getElementById('scan-status');
+      if (st) {
+        st.textContent = item ? ('✓ Added #' + item.code + ' — scan next when ready') : 'Added';
+        st.className = 'text-xs text-center mb-2 font-medium text-green-700';
+      }
+      window._scanLockUntil = Date.now() + 800;
+    }
+
+    function clearPendingScan() {
+      window._pendingScanItemId = null;
+      const box = document.getElementById('scan-confirm-box');
+      if (box) box.classList.add('hidden');
+      const st = document.getElementById('scan-status');
+      if (st && st.textContent.indexOf('Confirm') !== -1) {
+        st.textContent = 'Camera on — point at a code';
+        st.className = 'text-xs text-center mb-2 font-medium text-stone-500';
+      }
     }
 
     function manualAddCode() {
