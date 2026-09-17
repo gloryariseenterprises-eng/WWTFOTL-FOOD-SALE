@@ -50,7 +50,15 @@
       body * { visibility: hidden; }
       #label-print-area, #label-print-area * { visibility: visible; }
       #label-print-area { position: absolute; left: 0; top: 0; }
+      #print-codes-area, #print-codes-area * { visibility: visible !important; }
+      #print-codes-area {
+        position: absolute; left: 0; top: 0; width: 100%;
+        display: grid !important; grid-template-columns: repeat(3, 1fr);
+        gap: 10px; padding: 8px;
+      }
+      .code-card { border: 2px solid #000 !important; break-inside: avoid; page-break-inside: avoid; }
       .no-print { display: none !important; }
+      #admin-view header, #admin-stats { display: none !important; }
     }
     .label-40x30 { width: 151px; height: 113px; }
     .label-50x80 { width: 189px; height: 302px; }
@@ -63,7 +71,7 @@
     <header class="bg-teal-900 text-white">
       <div class="max-w-5xl mx-auto px-4 py-7 text-center">
         <div class="flex justify-center mb-3">
-          <img src="logo.png" alt="WWFL Logo" class="w-16 h-16 rounded-full shadow-lg border-2 border-teal-200/40" onerror="this.style.display='none'">
+          <img src="logo.png" alt="WWTFOTL Logo" class="w-16 h-16 rounded-full shadow-lg border-2 border-teal-200/40" onerror="this.style.display='none'">
         </div>
         <p class="text-teal-200 text-xs tracking-[0.2em] uppercase font-medium mb-1">Women With The Fear Of The Lord</p>
         <h1 class="font-display text-3xl md:text-4xl font-bold mb-2">Monthly Food Sale</h1>
@@ -152,7 +160,7 @@
     <header class="bg-teal-900 text-white sticky top-0 z-30">
       <div class="max-w-7xl mx-auto px-3 py-3 flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-3">
-          <img src="logo.png" alt="Logo" class="w-9 h-9 rounded-full border border-teal-300/50" onerror="this.style.display='none'">
+          <img src="logo.png" alt="WWTFOTL Logo" class="w-9 h-9 rounded-full border border-teal-300/50" onerror="this.style.display='none'">
           <div>
             <p class="text-teal-200 text-xs tracking-wider uppercase">WWFL Food Sale</p>
             <h1 class="font-display text-lg font-bold leading-tight">Admin Dashboard</h1>
@@ -1413,64 +1421,73 @@
       navigator.clipboard.writeText(ta.value).then(() => alert('Copied! Paste into Katasymbol app.')).catch(() => alert('Select the text and copy manually.'));
     }
 
+    function printCodesPage() {
+      // Ensure codes are visible then trigger print
+      const area = document.getElementById('print-codes-area');
+      if (!area || !area.children.length) {
+        alert('No menu items to print. Add items under Menu first.');
+        return;
+      }
+      window.print();
+    }
+
     function renderAdminCodes() {
       const content = document.getElementById('admin-tab-content');
+      const items = state.menu || [];
       content.innerHTML = `
         <div class="bg-white rounded-2xl card-shadow p-5 no-print">
           <div class="flex flex-wrap justify-between items-center gap-3 mb-2">
             <div>
               <h2 class="font-display text-lg font-bold text-teal-900">Printable Item Codes</h2>
-              <p class="text-sm text-stone-500">Big codes + QR codes for taping on food packages. Print this page.</p>
+              <p class="text-sm text-stone-500">Big codes + QR codes for taping on food packages.</p>
             </div>
-            <button onclick="window.print()" class="bg-teal-800 hover:bg-teal-900 text-white font-semibold px-5 py-2.5 rounded-xl">🖨 Print Codes</button>
+            <button type="button" id="btn-print-codes" onclick="printCodesPage()"
+              class="bg-teal-800 hover:bg-teal-900 active:bg-teal-950 text-white font-semibold px-5 py-3 rounded-xl shadow cursor-pointer"
+              style="pointer-events:auto;opacity:1">
+              🖨 Print Codes
+            </button>
           </div>
-          <p class="text-xs text-stone-500 mb-5">Tip: Use landscape orientation and “More settings → Background graphics” if your browser offers it, so the borders print clearly.</p>
+          <p class="text-xs text-stone-500 mb-3">${items.length} item(s). Tip: choose landscape and enable “Background graphics” if available.</p>
+          ${items.length === 0 ? '<p class="text-amber-700 text-sm font-medium">No menu items yet — add some under the Menu tab first.</p>' : ''}
         </div>
 
         <div id="print-codes-area" class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-          ${state.menu.map(item => `
+          ${items.map(item => `
             <div class="code-card bg-white border-2 border-stone-800 rounded-xl p-4 flex flex-col items-center text-center break-inside-avoid">
               <div class="font-mono font-black text-4xl tracking-wider mb-1">#${item.code}</div>
               <div class="font-bold text-base leading-tight mb-1">${item.name}</div>
-              <div class="text-sm text-stone-600 mb-3">$${item.price.toFixed(2)}</div>
-              <div id="qr-${item.id}" class="qr-box flex justify-center"></div>
+              <div class="text-sm text-stone-600 mb-3">$${Number(item.price).toFixed(2)}</div>
+              <div id="qr-${item.id}" class="qr-box flex justify-center min-h-[120px]"></div>
               <div class="text-[10px] text-stone-400 mt-2 font-mono">${item.code}</div>
             </div>
           `).join('')}
         </div>
-
-        <style>
-          @media print {
-            body * { visibility: hidden !important; }
-            #print-codes-area, #print-codes-area * { visibility: visible !important; }
-            #print-codes-area { position: absolute; left: 0; top: 0; width: 100%; display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 8px; }
-            .code-card { border: 2px solid #000 !important; break-inside: avoid; page-break-inside: avoid; }
-            .no-print { display: none !important; }
-            #admin-view header, #admin-stats { display: none !important; }
-          }
-        </style>
       `;
 
       // Generate QR codes after DOM is ready
       setTimeout(() => {
-        state.menu.forEach(item => {
+        items.forEach(item => {
           const el = document.getElementById('qr-' + item.id);
           if (!el) return;
           el.innerHTML = '';
           if (typeof QRCode !== 'undefined') {
-            new QRCode(el, {
-              text: item.code,
-              width: 120,
-              height: 120,
-              colorDark: '#000000',
-              colorLight: '#ffffff',
-              correctLevel: QRCode.CorrectLevel.M
-            });
+            try {
+              new QRCode(el, {
+                text: String(item.code),
+                width: 120,
+                height: 120,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+              });
+            } catch (e) {
+              el.innerHTML = '<div class="text-xs text-stone-400">QR error</div>';
+            }
           } else {
             el.innerHTML = '<div class="text-xs text-stone-400">QR unavailable</div>';
           }
         });
-      }, 50);
+      }, 80);
     }
 
     function renderAdminMenu() {
