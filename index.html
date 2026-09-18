@@ -65,9 +65,14 @@
       .no-print { display: none !important; }
       #admin-view header, #admin-stats { display: none !important; }
     }
-    .label-40x30 { width: 151px; height: 113px; }
-    .label-50x80 { width: 189px; height: 302px; }
-    .label-round50 { width: 189px; height: 189px; border-radius: 50%; }
+    .label-40x30 { width: 40mm; height: 30mm; }
+    .label-50x80 { width: 50mm; height: 80mm; }
+    .label-round50 { width: 50mm; height: 50mm; border-radius: 50%; }
+    @media screen {
+      .label-40x30 { width: 151px; height: 113px; }
+      .label-50x80 { width: 189px; height: 302px; }
+      .label-round50 { width: 189px; height: 189px; }
+    }
   </style>
 </head>
 <body class="bg-stone-50 text-stone-800 min-h-screen">
@@ -241,16 +246,19 @@
         <div id="label-print-area" class="bg-white border border-stone-300 shadow text-center flex flex-col items-center justify-center p-2 overflow-hidden"></div>
       </div>
       <p class="text-xs text-stone-500 mb-3 leading-relaxed">
-        <strong>How to print on SUPVAN T50M Pro:</strong><br>
-        1. Open the <strong>Katasymbol</strong> (or SUPRINT) app on your phone and connect the printer via Bluetooth.<br>
-        2. Create a new label of the selected size (or use a template).<br>
-        3. Copy the text below into the app, or take a screenshot of the preview and import the image.<br>
-        4. Or use the browser Print button and choose the printer if it appears as a system printer (USB on computer).
+        <strong>SUPVAN T50M Pro — 40×30 mm:</strong><br>
+        1. Connect printer in <strong>Katasymbol</strong> (Bluetooth).<br>
+        2. Select <strong>40×30 mm</strong> tape.<br>
+        3. Tap <strong>Copy Text</strong>, paste into one text box.<br>
+        4. Set font to <strong>7–9 pt</strong> (default is usually too big).<br>
+        5. Center · Print <strong>1</strong> test label first.<br>
+        Or try <strong>Browser Print</strong> (allow pop-ups for this site).
       </p>
-      <textarea id="label-text-for-app" class="w-full text-xs border rounded-lg p-2 mb-3 h-20 font-mono" readonly></textarea>
+      <textarea id="label-text-for-app" class="w-full text-xs border rounded-lg p-2 mb-1 h-20 font-mono" readonly></textarea>
+      <p id="label-size-hint" class="text-[11px] text-amber-800 mb-3">Katasymbol tip: for 40×30 mm use font size 7–9 pt (not the default large size).</p>
       <div class="flex gap-2">
-        <button onclick="copyLabelText()" class="flex-1 bg-stone-100 hover:bg-stone-200 py-2.5 rounded-xl text-sm font-medium">Copy Text</button>
-        <button onclick="window.print()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl text-sm font-medium">Browser Print</button>
+        <button type="button" onclick="copyLabelText()" class="flex-1 bg-stone-100 hover:bg-stone-200 py-2.5 rounded-xl text-sm font-medium">Copy Text</button>
+        <button type="button" onclick="printLabelBrowser()" class="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl text-sm font-medium">Browser Print</button>
       </div>
     </div>
   </div>
@@ -1419,37 +1427,86 @@
 
       if (!currentLabelOrder) return;
       const o = currentLabelOrder;
-      const itemsShort = o.items.map(i => `${i.qty}×${i.name.split(/[\s\/]/)[0]}`).join(' ');
-      let html = '';
+      const firstName = (o.customerName || '').split(' ')[0];
+      const shortId = (o.id || '').slice(-6);
+      // Very short item names for small labels
+      const itemsTiny = o.items.map(i => {
+        const word = (i.name || '').replace(/w\/.*/i,'').trim().split(/\s+/)[0];
+        return i.qty + 'x' + word.slice(0, 10);
+      }).join(' ');
+      const itemsLine = o.items.map(i => i.qty + 'x ' + i.name).join(', ');
+      let inner = '';
       let plain = '';
       if (size === '40x30') {
-        html = `<div class="text-[9px] font-bold leading-tight">${o.customerName}</div>
-          <div class="text-[8px] font-mono mt-0.5">${o.id}</div>
-          <div class="text-[8px] mt-0.5 leading-tight">${itemsShort}</div>
-          <div class="text-[9px] font-bold mt-0.5">$${o.total.toFixed(2)}</div>`;
-        plain = `${o.customerName}\n${o.id}\n${itemsShort}\n$${o.total.toFixed(2)}`;
+        // Compact layout sized for 40×30 mm thermal
+        inner = `<div style="font-size:9px;font-weight:700;line-height:1.15;max-width:100%;overflow:hidden">${firstName}</div>
+          <div style="font-size:7px;font-family:monospace;line-height:1.1">#${shortId}</div>
+          <div style="font-size:7px;line-height:1.15;max-width:100%;overflow:hidden">${itemsTiny}</div>
+          <div style="font-size:9px;font-weight:700">$${o.total.toFixed(2)}</div>`;
+        // Plain text optimized for Katasymbol: short lines, no extra blank lines
+        plain = firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + o.total.toFixed(2);
       } else if (size === '50x80') {
-        html = `<div class="text-[11px] font-bold">${o.customerName}</div>
-          <div class="text-[9px] font-mono text-stone-600">${o.id}</div>
-          <div class="text-[9px] mt-1 text-left w-full px-1">${o.items.map(i=>`${i.qty}× ${i.name}`).join('<br>')}</div>
-          <div class="text-[11px] font-bold mt-1">$${o.total.toFixed(2)} · ${o.paymentMethod}</div>
-          <div class="text-[8px] mt-0.5">Pickup: ${o.pickupDate}</div>
-          ${o.notes ? `<div class="text-[8px] text-red-700 mt-0.5">⚠ ${o.notes}</div>` : ''}`;
-        plain = `${o.customerName}\n${o.id}\n${o.items.map(i=>`${i.qty}× ${i.name}`).join('\n')}\n$${o.total.toFixed(2)} · ${o.paymentMethod}\nPickup: ${o.pickupDate}${o.notes?'\nNotes: '+o.notes:''}`;
+        inner = `<div style="font-size:11px;font-weight:700">${o.customerName}</div>
+          <div style="font-size:8px;font-family:monospace;color:#444">${o.id}</div>
+          <div style="font-size:9px;margin-top:4px;text-align:left;width:100%;padding:0 4px">${o.items.map(i=>i.qty+'× '+i.name).join('<br>')}</div>
+          <div style="font-size:11px;font-weight:700;margin-top:4px">$${o.total.toFixed(2)} · ${o.paymentMethod||''}</div>
+          <div style="font-size:8px">Pickup: ${o.pickupDate||''}</div>
+          ${o.notes ? `<div style="font-size:8px;color:#b91c1c">⚠ ${o.notes}</div>` : ''}`;
+        plain = o.customerName + '\n' + o.id + '\n' + o.items.map(i=>i.qty+'x '+i.name).join('\n') + '\n$' + o.total.toFixed(2) + ' · ' + (o.paymentMethod||'') + '\nPickup: ' + (o.pickupDate||'') + (o.notes ? '\n' + o.notes : '');
       } else {
-        html = `<div class="text-[10px] font-bold leading-tight px-2">${o.customerName}</div>
-          <div class="text-[8px] font-mono">${o.id.slice(-8)}</div>
-          <div class="text-[9px] font-bold mt-1">$${o.total.toFixed(2)}</div>`;
-        plain = `${o.customerName}\n${o.id}\n$${o.total.toFixed(2)}`;
+        inner = `<div style="font-size:10px;font-weight:700;line-height:1.2;padding:0 6px">${firstName}</div>
+          <div style="font-size:7px;font-family:monospace">#${shortId}</div>
+          <div style="font-size:10px;font-weight:700;margin-top:4px">$${o.total.toFixed(2)}</div>`;
+        plain = firstName + '\n#' + shortId + '\n$' + o.total.toFixed(2);
       }
-      area.innerHTML = html;
+      area.innerHTML = inner;
       document.getElementById('label-text-for-app').value = plain;
+      const hint = document.getElementById('label-size-hint');
+      if (hint) {
+        if (size === '40x30') hint.textContent = 'Katasymbol tip: set font ~7–9 pt, center, single text box. Paste once — do not scale up.';
+        else if (size === '50x80') hint.textContent = 'Katasymbol tip: font ~10–12 pt for name, ~8–9 pt for items.';
+        else hint.textContent = 'Katasymbol tip: font ~9–11 pt, center on round label.';
+      }
     }
 
     function copyLabelText() {
       const ta = document.getElementById('label-text-for-app');
+      if (!ta || !ta.value) { alert('Open a label first.'); return; }
       ta.select();
-      navigator.clipboard.writeText(ta.value).then(() => alert('Copied! Paste into Katasymbol app.')).catch(() => alert('Select the text and copy manually.'));
+      ta.setSelectionRange(0, 999);
+      navigator.clipboard.writeText(ta.value).then(() => {
+        alert('Copied for 40×30 / small labels.\n\nIn Katasymbol:\n1) Choose 40×30 mm tape\n2) Font size 7–9 pt (not default large)\n3) Paste\n4) Center text\n5) Print 1 test label');
+      }).catch(() => alert('Select the text box and copy manually (long-press → Copy).'));
+    }
+
+    function printLabelBrowser() {
+      const area = document.getElementById('label-print-area');
+      if (!area || !area.innerHTML.trim()) {
+        alert('Open an order label first.');
+        return;
+      }
+      const size = currentLabelSize || '40x30';
+      let pageSize = '40mm 30mm';
+      let w = '40mm', h = '30mm';
+      if (size === '50x80') { pageSize = '50mm 80mm'; w = '50mm'; h = '80mm'; }
+      if (size === 'round50') { pageSize = '50mm 50mm'; w = '50mm'; h = '50mm'; }
+      const htmlDoc = '<!DOCTYPE html><html><head><title>Label</title><style>'
+        + '@page { size: ' + pageSize + '; margin: 1mm; }'
+        + 'html,body { margin:0; padding:0; width:' + w + '; height:' + h + '; }'
+        + 'body { display:flex; align-items:center; justify-content:center; font-family: Helvetica, Arial, sans-serif; -webkit-print-color-adjust: exact; }'
+        + '.box { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; overflow:hidden; padding:1mm; box-sizing:border-box; }'
+        + '</style></head><body><div class="box">' + area.innerHTML + '</div></body></html>';
+      const win = window.open('', '_blank', 'noopener,noreferrer,width=400,height=400');
+      if (!win) {
+        alert('Pop-up blocked. Allow pop-ups for this site, or use Copy Text into Katasymbol.');
+        return;
+      }
+      win.document.open();
+      win.document.write(htmlDoc);
+      win.document.close();
+      setTimeout(function() {
+        try { win.focus(); win.print(); } catch (e) { alert('Print failed. Use Copy Text instead.'); }
+      }, 300);
     }
 
     function printCodesPage() {
