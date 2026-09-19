@@ -842,7 +842,8 @@
                   ${o.status === 'ready' && o.phone ? `<button type="button" onclick="textCustomer('${o.id}')" class="text-[10px] bg-green-700 text-white rounded px-2 py-1">${o.readyTextSent ? '📱 Text again' : '📱 Text Only'}</button>` : ''}
                   ${o.readyTextSent ? `<span class="text-[10px] text-green-700 font-semibold">✓ Texted</span>` : ''}
                   ${o.status !== 'cancelled' && o.status !== 'picked_up' ? `<button onclick="cancelOrder('${o.id}')" class="text-[10px] text-red-600 px-1.5 py-1 hover:bg-red-50 rounded">Cancel</button>` : ''}
-                  <button onclick="openLabelModal('${o.id}')" class="text-[10px] bg-stone-100 text-stone-700 rounded px-2 py-1 hover:bg-stone-200">🏷 Label</button>
+                  <button type="button" onclick="printLabelDirect('${o.id}')" class="text-[10px] bg-teal-800 text-white rounded px-2 py-1 font-semibold">🖨 Print</button>
+                  <button type="button" onclick="openLabelModal('${o.id}')" class="text-[10px] bg-stone-100 text-stone-700 rounded px-2 py-1">Copy</button>
                 </div>
               </div>`).join('')}
           </div>
@@ -1366,38 +1367,145 @@
         </div>`;
     }
 
+    function labelOrderLines(o) {
+      const firstName = (o.customerName || '').split(' ')[0];
+      const shortId = (o.id || '').slice(-6);
+      const itemsTiny = (o.items || []).map(i => {
+        const word = (i.name || '').replace(/w\/.*/i,'').trim().split(/\s+/)[0];
+        return i.qty + 'x' + word.slice(0, 10);
+      }).join(' ');
+      return {
+        firstName,
+        shortId,
+        itemsTiny,
+        total: Number(o.total || 0).toFixed(2),
+        plain: firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + Number(o.total || 0).toFixed(2),
+        plainFull: "GRA's W.W.T.F.O.T.L.\nProverbs 31 Kitchen\n" + firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + Number(o.total || 0).toFixed(2) + '\nQuality That Serves'
+      };
+    }
+
+    function buildLabelHtml(o) {
+      const L = labelOrderLines(o);
+      return '<div class="lbl" style="width:40mm;height:30mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;padding:1.2mm;box-sizing:border-box;page-break-after:always;border:0.3mm solid #ccc;">'
+        + '<div style="font-size:5.5pt;font-weight:700;letter-spacing:0.03em;line-height:1.1">GRA\'s W.W.T.F.O.T.L.</div>'
+        + '<div style="font-size:5pt;line-height:1.1;margin-bottom:0.5mm">Proverbs 31 Kitchen</div>'
+        + '<div style="font-size:8pt;font-weight:700;line-height:1.15">' + L.firstName + '</div>'
+        + '<div style="font-size:6pt;font-family:monospace;line-height:1.1">#' + L.shortId + '</div>'
+        + '<div style="font-size:6pt;line-height:1.15">' + L.itemsTiny + '</div>'
+        + '<div style="font-size:8pt;font-weight:700">$' + L.total + '</div>'
+        + '<div style="font-size:5pt;margin-top:0.4mm">Quality That Serves</div>'
+        + '</div>';
+    }
+
+    function openLabelPrintWindow(htmlLabels, title) {
+      const doc = '<!DOCTYPE html><html><head><title>' + (title || 'Labels') + '</title><style>'
+        + '@page { size: 40mm 30mm; margin: 0; }'
+        + 'html,body{margin:0;padding:0;}'
+        + 'body{font-family:Helvetica,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+        + '@media screen { body{padding:12px;background:#eee;} .lbl{background:#fff;margin:8px auto;box-shadow:0 1px 4px rgba(0,0,0,.15);} }'
+        + '@media print { .lbl{border:none !important;} }'
+        + '</style></head><body>' + htmlLabels + '</body></html>';
+      const win = window.open('', '_blank', 'noopener,noreferrer,width=480,height=640');
+      if (!win) {
+        alert('Pop-up blocked. Allow pop-ups for this site, then try again.\n\nOr use Copy All for Katasymbol.');
+        return null;
+      }
+      win.document.open();
+      win.document.write(doc);
+      win.document.close();
+      setTimeout(function() {
+        try { win.focus(); win.print(); } catch (e) {}
+      }, 350);
+      return win;
+    }
+
+    function printLabelDirect(orderId) {
+      const o = state.orders.find(x => x.id === orderId);
+      if (!o) return;
+      openLabelPrintWindow(buildLabelHtml(o), 'Label ' + (o.customerName || ''));
+    }
+
+    function printBulkLabels(mode) {
+      let list = (state.orders || []).filter(o => o.status !== 'cancelled');
+      if (mode === 'ready') list = list.filter(o => o.status === 'ready' || o.status === 'paid');
+      else if (mode === 'ready_only') list = list.filter(o => o.status === 'ready');
+      else list = list.slice(0, 40);
+      if (!list.length) {
+        alert('No matching orders to print.');
+        return;
+      }
+      if (!confirm('Open print window for ' + list.length + ' label(s)?\n\nEach page is 40×30 mm. Choose your printer (or Save as PDF).\nAllow pop-ups if asked.')) return;
+      const html = list.map(buildLabelHtml).join('');
+      openLabelPrintWindow(html, 'Bulk labels (' + list.length + ')');
+    }
+
+    function copyBulkLabels(mode) {
+      let list = (state.orders || []).filter(o => o.status !== 'cancelled');
+      if (mode === 'ready') list = list.filter(o => o.status === 'ready' || o.status === 'paid');
+      else list = list.slice(0, 40);
+      if (!list.length) { alert('No orders.'); return; }
+      const text = list.map(o => labelOrderLines(o).plain).join('\n---\n');
+      navigator.clipboard.writeText(text).then(function() {
+        alert('Copied ' + list.length + ' order(s).\n\nIn Katasymbol: paste one block at a time (split by ---), or print from the website bulk Print instead.');
+      }).catch(function() {
+        prompt('Copy this text:', text);
+      });
+    }
+
     function renderAdminLabels() {
       const content = document.getElementById('admin-tab-content');
-      const recent = state.orders.filter(o => o.status !== 'cancelled').slice(0, 30);
+      const recent = state.orders.filter(o => o.status !== 'cancelled').slice(0, 40);
+      const needLabel = state.orders.filter(o => o.status === 'paid' || o.status === 'ready');
       content.innerHTML = `
-        <div class="bg-white rounded-2xl card-shadow p-5">
-          <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Labels for SUPVAN T50M Pro</h2>
-          <p class="text-sm text-stone-500 mb-4">Supports your three tapes: <strong>40×30 mm</strong>, <strong>50×80 mm</strong>, and <strong>Ø50 mm (round)</strong>. Use the Katasymbol app over Bluetooth.</p>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead><tr class="border-b text-left text-stone-500 text-xs">
-                <th class="pb-2 pr-3">Order</th><th class="pb-2 pr-3">Customer</th><th class="pb-2 pr-3">Items</th><th class="pb-2 pr-3">Total</th><th class="pb-2">Print</th>
-              </tr></thead>
-              <tbody>
-                ${recent.length === 0 ? '<tr><td colspan="5" class="py-6 text-center text-stone-400">No orders yet</td></tr>' :
-                  recent.map(o => `<tr class="border-b border-stone-50">
-                    <td class="py-2.5 pr-3 font-mono text-xs">${o.id}</td>
-                    <td class="py-2.5 pr-3 font-medium">${o.customerName}</td>
-                    <td class="py-2.5 pr-3 text-xs text-stone-600 max-w-[180px] truncate">${o.items.map(i=>`${i.qty}×${i.name.split(' ')[0]}`).join(', ')}</td>
-                    <td class="py-2.5 pr-3">$${o.total.toFixed(2)}</td>
-                    <td class="py-2.5"><button onclick="openLabelModal('${o.id}')" class="text-xs bg-teal-800 text-white px-2.5 py-1.5 rounded-lg hover:bg-teal-900">Label</button></td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
+        <div class="space-y-4">
+          <div class="bg-white rounded-2xl card-shadow p-5">
+            <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Labels — faster print</h2>
+            <p class="text-sm text-stone-500 mb-4">One-tap browser print (40×30 mm pages) or bulk print. Katasymbol still works if you prefer Copy.</p>
+
+            <div class="grid sm:grid-cols-2 gap-2 mb-4">
+              <button type="button" onclick="printBulkLabels('ready')" class="bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 px-4 rounded-xl text-sm">
+                🖨 Print all Paid + Ready (${needLabel.length})
+              </button>
+              <button type="button" onclick="printBulkLabels('ready_only')" class="bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 px-4 rounded-xl text-sm">
+                🖨 Print Ready only
+              </button>
+              <button type="button" onclick="printBulkLabels('all')" class="bg-stone-700 hover:bg-stone-800 text-white font-semibold py-3 px-4 rounded-xl text-sm">
+                🖨 Print last 40 orders
+              </button>
+              <button type="button" onclick="copyBulkLabels('ready')" class="bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold py-3 px-4 rounded-xl text-sm">
+                📋 Copy Paid+Ready text
+              </button>
+            </div>
+
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 mb-2">
+              <strong>Fast path:</strong> Tap <em>Print all Paid + Ready</em> → allow pop-up → in the print dialog pick your printer or Save as PDF.
+              If the SUPVAN does not appear as a system printer, use Katasymbol with Copy, or AirPrint/USB if available.
+            </div>
           </div>
-          <div class="mt-5 p-4 bg-teal-50 rounded-xl text-sm text-teal-900">
-            <p class="font-semibold mb-1">Printing workflow with your SUPVAN T50M Pro</p>
-            <ol class="list-decimal list-inside space-y-1 text-teal-800">
-              <li>Turn on the T50M Pro and open the <strong>Katasymbol</strong> app on your phone.</li>
-              <li>Connect via Bluetooth inside the app.</li>
-              <li>Choose the correct label size (40×30, 50×80, or round Ø50).</li>
-              <li>Click <strong>Label</strong> on an order → Copy Text (or screenshot the preview) → paste / import into Katasymbol → Print.</li>
-            </ol>
+
+          <div class="bg-white rounded-2xl card-shadow p-5">
+            <p class="text-xs font-semibold text-stone-500 uppercase mb-2">Per order — one tap</p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead><tr class="border-b text-left text-stone-500 text-xs">
+                  <th class="pb-2 pr-2">Customer</th><th class="pb-2 pr-2">Items</th><th class="pb-2 pr-2">Status</th><th class="pb-2">Actions</th>
+                </tr></thead>
+                <tbody>
+                  ${recent.length === 0 ? '<tr><td colspan="4" class="py-6 text-center text-stone-400">No orders yet</td></tr>' :
+                    recent.map(o => `<tr class="border-b border-stone-50">
+                      <td class="py-2 pr-2 font-medium">${o.customerName}<br><span class="text-[10px] font-mono text-stone-400">${o.id}</span></td>
+                      <td class="py-2 pr-2 text-xs text-stone-600">${(o.items||[]).map(i=>i.qty+'×'+(i.name||'').split(' ')[0]).join(', ')}</td>
+                      <td class="py-2 pr-2">${statusBadge(o.status)}</td>
+                      <td class="py-2">
+                        <div class="flex flex-wrap gap-1">
+                          <button type="button" onclick="printLabelDirect('${o.id}')" class="text-[10px] bg-teal-800 text-white rounded px-2 py-1 font-semibold">🖨 Print</button>
+                          <button type="button" onclick="openLabelModal('${o.id}')" class="text-[10px] bg-stone-100 rounded px-2 py-1">Copy / edit</button>
+                        </div>
+                      </td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>`;
     }
@@ -1483,33 +1591,11 @@
     }
 
     function printLabelBrowser() {
-      const area = document.getElementById('label-print-area');
-      if (!area || !area.innerHTML.trim()) {
-        alert('Open an order label first.');
+      if (currentLabelOrder) {
+        printLabelDirect(currentLabelOrder.id);
         return;
       }
-      const size = currentLabelSize || '40x30';
-      let pageSize = '40mm 30mm';
-      let w = '40mm', h = '30mm';
-      if (size === '50x80') { pageSize = '50mm 80mm'; w = '50mm'; h = '80mm'; }
-      if (size === 'round50') { pageSize = '50mm 50mm'; w = '50mm'; h = '50mm'; }
-      const htmlDoc = '<!DOCTYPE html><html><head><title>Label</title><style>'
-        + '@page { size: ' + pageSize + '; margin: 1mm; }'
-        + 'html,body { margin:0; padding:0; width:' + w + '; height:' + h + '; }'
-        + 'body { display:flex; align-items:center; justify-content:center; font-family: Helvetica, Arial, sans-serif; -webkit-print-color-adjust: exact; }'
-        + '.box { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; overflow:hidden; padding:1mm; box-sizing:border-box; }'
-        + '</style></head><body><div class="box">' + area.innerHTML + '</div></body></html>';
-      const win = window.open('', '_blank', 'noopener,noreferrer,width=400,height=400');
-      if (!win) {
-        alert('Pop-up blocked. Allow pop-ups for this site, or use Copy Text into Katasymbol.');
-        return;
-      }
-      win.document.open();
-      win.document.write(htmlDoc);
-      win.document.close();
-      setTimeout(function() {
-        try { win.focus(); win.print(); } catch (e) { alert('Print failed. Use Copy Text instead.'); }
-      }, 300);
+      alert('Open an order label first.');
     }
 
     function printCodesPage() {
