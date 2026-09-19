@@ -1398,16 +1398,36 @@
     }
 
     function openLabelPrintWindow(htmlLabels, title) {
-      const doc = '<!DOCTYPE html><html><head><title>' + (title || 'Labels') + '</title><style>'
+      const doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + (title || 'Labels') + '</title><style>'
         + '@page { size: 40mm 30mm; margin: 0; }'
         + 'html,body{margin:0;padding:0;}'
         + 'body{font-family:Helvetica,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
-        + '@media screen { body{padding:12px;background:#eee;} .lbl{background:#fff;margin:8px auto;box-shadow:0 1px 4px rgba(0,0,0,.15);} }'
-        + '@media print { .lbl{border:none !important;} }'
-        + '</style></head><body>' + htmlLabels + '</body></html>';
-      const win = window.open('', '_blank', 'noopener,noreferrer,width=480,height=640');
+        + '@media screen { body{padding:16px;background:#e7e5e4;} .lbl{background:#fff;margin:10px auto;box-shadow:0 1px 4px rgba(0,0,0,.15);} .hint{font:14px sans-serif;color:#444;margin:0 0 12px;text-align:center;} }'
+        + '@media print { .hint{display:none !important;} .lbl{border:none !important;box-shadow:none !important;margin:0;} }'
+        + '</style></head><body>'
+        + '<p class="hint">If you see this page, printing is working. Use Print (or Cmd+P). Close when done.</p>'
+        + htmlLabels
+        + '</body></html>';
+
+      // Blob URL is more reliable in Chrome than about:blank + document.write
+      let win = null;
+      try {
+        const blob = new Blob([doc], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        win = window.open(url, '_blank');
+        if (win) {
+          setTimeout(function() {
+            try { win.focus(); win.print(); } catch (e) {}
+            setTimeout(function() { try { URL.revokeObjectURL(url); } catch (e2) {} }, 60000);
+          }, 500);
+          return win;
+        }
+      } catch (e) {}
+
+      // Fallback: about:blank + write
+      win = window.open('', '_blank');
       if (!win) {
-        alert('Pop-up blocked. Allow pop-ups for this site, then try again.\n\nOr use Copy All for Katasymbol.');
+        alert('Pop-up blocked in Chrome.\\n\\n1) Click the pop-up icon in the address bar\\n2) Allow pop-ups for gloryariseenterprises-eng.github.io\\n3) Try Print again');
         return null;
       }
       win.document.open();
@@ -1415,7 +1435,7 @@
       win.document.close();
       setTimeout(function() {
         try { win.focus(); win.print(); } catch (e) {}
-      }, 350);
+      }, 500);
       return win;
     }
 
