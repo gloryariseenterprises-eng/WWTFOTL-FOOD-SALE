@@ -1438,13 +1438,15 @@
       let inner = '';
       let plain = '';
       if (size === '40x30') {
-        // Compact layout sized for 40×30 mm thermal
-        inner = `<div style="font-size:9px;font-weight:700;line-height:1.15;max-width:100%;overflow:hidden">${firstName}</div>
-          <div style="font-size:7px;font-family:monospace;line-height:1.1">#${shortId}</div>
-          <div style="font-size:7px;line-height:1.15;max-width:100%;overflow:hidden">${itemsTiny}</div>
-          <div style="font-size:9px;font-weight:700">$${o.total.toFixed(2)}</div>`;
-        // Plain text optimized for Katasymbol: short lines, no extra blank lines
-        plain = firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + o.total.toFixed(2);
+        // Compact 40×30 mm — small hierarchy so text is not huge in Katasymbol
+        inner = `<div style="font-size:6px;font-weight:700;letter-spacing:0.04em;line-height:1.1">GRA's W.W.T.F.O.T.L.</div>
+          <div style="font-size:5px;color:#444;margin:1px 0 2px">Proverbs 31 Kitchen</div>
+          <div style="font-size:8px;font-weight:700;line-height:1.15">${firstName}</div>
+          <div style="font-size:6px;font-family:monospace;line-height:1.1">#${shortId}</div>
+          <div style="font-size:6px;line-height:1.15;max-width:100%;overflow:hidden">${itemsTiny}</div>
+          <div style="font-size:8px;font-weight:700">$${o.total.toFixed(2)}</div>
+          <div style="font-size:5px;margin-top:1px;color:#333">Quality That Serves</div>`;
+        plain = "GRA's W.W.T.F.O.T.L.\nProverbs 31 Kitchen\n" + firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + o.total.toFixed(2) + '\nQuality That Serves';
       } else if (size === '50x80') {
         inner = `<div style="font-size:11px;font-weight:700">${o.customerName}</div>
           <div style="font-size:8px;font-family:monospace;color:#444">${o.id}</div>
@@ -1463,7 +1465,7 @@
       document.getElementById('label-text-for-app').value = plain;
       const hint = document.getElementById('label-size-hint');
       if (hint) {
-        if (size === '40x30') hint.textContent = 'Katasymbol tip: set font ~7–9 pt, center, single text box. Paste once — do not scale up.';
+        if (size === '40x30') hint.textContent = 'Katasymbol: 40×30 · font 6–8 pt · do NOT auto-fit/enlarge · center · print 1 test';
         else if (size === '50x80') hint.textContent = 'Katasymbol tip: font ~10–12 pt for name, ~8–9 pt for items.';
         else hint.textContent = 'Katasymbol tip: font ~9–11 pt, center on round label.';
       }
@@ -1475,7 +1477,7 @@
       ta.select();
       ta.setSelectionRange(0, 999);
       navigator.clipboard.writeText(ta.value).then(() => {
-        alert('Copied for 40×30 / small labels.\n\nIn Katasymbol:\n1) Choose 40×30 mm tape\n2) Font size 7–9 pt (not default large)\n3) Paste\n4) Center text\n5) Print 1 test label');
+        alert('Copied for 40×30 / small labels.\n\nIn Katasymbol:\n1) Choose 40×30 mm tape\n2) Font size 6–8 pt (smaller than default)\n3) Paste — do not scale to fill\n4) Center\n5) Print 1 test');
       }).catch(() => alert('Select the text box and copy manually (long-press → Copy).'));
     }
 
