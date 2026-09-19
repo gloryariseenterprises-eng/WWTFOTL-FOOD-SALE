@@ -1446,7 +1446,8 @@
           <div style="font-size:6px;line-height:1.15;max-width:100%;overflow:hidden">${itemsTiny}</div>
           <div style="font-size:8px;font-weight:700">$${o.total.toFixed(2)}</div>
           <div style="font-size:5px;margin-top:1px;color:#333">Quality That Serves</div>`;
-        plain = "GRA's W.W.T.F.O.T.L.\nProverbs 31 Kitchen\n" + firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + o.total.toFixed(2) + '\nQuality That Serves';
+        // Order details only — header/footer live in your Katasymbol template
+        plain = firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + o.total.toFixed(2);
       } else if (size === '50x80') {
         inner = `<div style="font-size:11px;font-weight:700">${o.customerName}</div>
           <div style="font-size:8px;font-family:monospace;color:#444">${o.id}</div>
@@ -1465,7 +1466,7 @@
       document.getElementById('label-text-for-app').value = plain;
       const hint = document.getElementById('label-size-hint');
       if (hint) {
-        if (size === '40x30') hint.textContent = 'Katasymbol: 40×30 · font 6–8 pt · do NOT auto-fit/enlarge · center · print 1 test';
+        if (size === '40x30') hint.textContent = 'Template has header/footer. CopyText = order only. Paste in middle → Print in Katasymbol.';
         else if (size === '50x80') hint.textContent = 'Katasymbol tip: font ~10–12 pt for name, ~8–9 pt for items.';
         else hint.textContent = 'Katasymbol tip: font ~9–11 pt, center on round label.';
       }
@@ -1477,7 +1478,7 @@
       ta.select();
       ta.setSelectionRange(0, 999);
       navigator.clipboard.writeText(ta.value).then(() => {
-        alert('Copied for 40×30 / small labels.\n\nIn Katasymbol:\n1) Choose 40×30 mm tape\n2) Font size 6–8 pt (smaller than default)\n3) Paste — do not scale to fill\n4) Center\n5) Print 1 test');
+        alert('Order text copied.\n\nNext (in Katasymbol — not this website):\n1) Open your 40×30 template\n2) Tap the middle text box\n3) Paste (name, #, items, price only)\n4) Tap Print in Katasymbol\n\nHeader/footer stay on the template.');
       }).catch(() => alert('Select the text box and copy manually (long-press → Copy).'));
     }
 
