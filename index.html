@@ -1386,14 +1386,12 @@
 
     function buildLabelHtml(o) {
       const L = labelOrderLines(o);
-      return '<div class="lbl" style="width:40mm;height:30mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;padding:1.2mm;box-sizing:border-box;page-break-after:always;border:0.3mm solid #ccc;">'
-        + '<div style="font-size:5.5pt;font-weight:700;letter-spacing:0.03em;line-height:1.1">GRA\'s W.W.T.F.O.T.L.</div>'
-        + '<div style="font-size:5pt;line-height:1.1;margin-bottom:0.5mm">Proverbs 31 Kitchen</div>'
-        + '<div style="font-size:8pt;font-weight:700;line-height:1.15">' + L.firstName + '</div>'
-        + '<div style="font-size:6pt;font-family:monospace;line-height:1.1">#' + L.shortId + '</div>'
-        + '<div style="font-size:6pt;line-height:1.15">' + L.itemsTiny + '</div>'
-        + '<div style="font-size:8pt;font-weight:700">$' + L.total + '</div>'
-        + '<div style="font-size:5pt;margin-top:0.4mm">Quality That Serves</div>'
+      // Order details only — header/footer are on the T50M / Katasymbol template
+      return '<div class="lbl" style="width:40mm;height:30mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;padding:1.5mm;box-sizing:border-box;page-break-after:always;border:0.3mm solid #ccc;">'
+        + '<div style="font-size:10pt;font-weight:700;line-height:1.2">' + L.firstName + '</div>'
+        + '<div style="font-size:8pt;font-family:monospace;line-height:1.2">#' + L.shortId + '</div>'
+        + '<div style="font-size:8pt;line-height:1.2;margin-top:1mm">' + L.itemsTiny + '</div>'
+        + '<div style="font-size:10pt;font-weight:700;margin-top:1mm">$' + L.total + '</div>'
         + '</div>';
     }
 
@@ -1480,7 +1478,7 @@
         <div class="space-y-4">
           <div class="bg-white rounded-2xl card-shadow p-5">
             <h2 class="font-display text-lg font-bold text-teal-900 mb-1">Labels — faster print</h2>
-            <p class="text-sm text-stone-500 mb-4">One-tap browser print (40×30 mm pages) or bulk print. Katasymbol still works if you prefer Copy.</p>
+            <p class="text-sm text-stone-500 mb-4">Copy text is for Katasymbol (T50M). Browser print only works if a system printer appears — T50M usually does not.</p>
 
             <div class="grid sm:grid-cols-2 gap-2 mb-4">
               <button type="button" onclick="printBulkLabels('ready')" class="bg-teal-800 hover:bg-teal-900 text-white font-semibold py-3 px-4 rounded-xl text-sm">
@@ -1498,8 +1496,9 @@
             </div>
 
             <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 mb-2">
-              <strong>Fast path:</strong> Tap <em>Print all Paid + Ready</em> → allow pop-up → in the print dialog pick your printer or Save as PDF.
-              If the SUPVAN does not appear as a system printer, use Katasymbol with Copy, or AirPrint/USB if available.
+              <strong>T50M / Katasymbol:</strong> The printer will <em>not</em> show in Chrome (Save as PDF is normal).
+              Use <strong>Copy</strong> on each order → paste into your template middle → Print in Katasymbol.
+              Browser Print is only if you later use a system/AirPrint printer.
             </div>
           </div>
 
@@ -1567,13 +1566,11 @@
       let plain = '';
       if (size === '40x30') {
         // Compact 40×30 mm — small hierarchy so text is not huge in Katasymbol
-        inner = `<div style="font-size:6px;font-weight:700;letter-spacing:0.04em;line-height:1.1">GRA's W.W.T.F.O.T.L.</div>
-          <div style="font-size:5px;color:#444;margin:1px 0 2px">Proverbs 31 Kitchen</div>
-          <div style="font-size:8px;font-weight:700;line-height:1.15">${firstName}</div>
-          <div style="font-size:6px;font-family:monospace;line-height:1.1">#${shortId}</div>
-          <div style="font-size:6px;line-height:1.15;max-width:100%;overflow:hidden">${itemsTiny}</div>
-          <div style="font-size:8px;font-weight:700">$${o.total.toFixed(2)}</div>
-          <div style="font-size:5px;margin-top:1px;color:#333">Quality That Serves</div>`;
+        inner = `<div style="font-size:10px;font-weight:700;line-height:1.2">${firstName}</div>
+          <div style="font-size:8px;font-family:monospace;line-height:1.2">#${shortId}</div>
+          <div style="font-size:8px;line-height:1.2;margin-top:2px;max-width:100%;overflow:hidden">${itemsTiny}</div>
+          <div style="font-size:10px;font-weight:700;margin-top:2px">$${o.total.toFixed(2)}</div>
+          <div style="font-size:6px;margin-top:4px;color:#888">→ paste into T50M template</div>`;
         // Order details only — header/footer live in your Katasymbol template
         plain = firstName + '\n#' + shortId + '\n' + itemsTiny + '\n$' + o.total.toFixed(2);
       } else if (size === '50x80') {
