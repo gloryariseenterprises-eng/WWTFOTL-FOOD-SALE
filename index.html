@@ -1926,9 +1926,9 @@
             </label>
             <label class="flex items-start gap-2 mb-3 text-sm">
               <input type="checkbox" id="reset-stock" class="mt-1" checked>
-              <span>Reset stock quantities to the original demo numbers</span>
+              <span>Reset stock on all items (uses restock amounts — see Menu)</span>
             </label>
-            <p class="text-xs text-stone-400 mb-3">Menu names, prices, and codes are kept. Settings (date, Square, etc.) are kept.</p>
+            <p class="text-xs text-stone-400 mb-3">Menu names, prices, and codes are kept. Stock goes back to each item's restock amount. Tip: set stock in Menu, then use "Save stock as restock defaults".</p>
             <button type="button" onclick="resetForNewMonth()" class="w-full bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 rounded-xl">
               Start new month
             </button>
@@ -1946,12 +1946,11 @@
         return;
       }
       const parts = [];
-      if (clearOrders) parts.push('clear ALL orders');
-      if (resetStock) parts.push('reset stock quantities');
-      if (!confirm('Start new month?\n\nThis will: ' + parts.join(' and ') + '.\n\nOrders will be archived (not permanently deleted) so you can view past months in Reports.')) return;
+      if (clearOrders) parts.push('archive and clear ALL orders');
+      if (resetStock) parts.push('reset stock on ALL menu items');
+      if (!confirm('Start new month?\n\nThis will: ' + parts.join(' and ') + '.\n\nOrders are archived under Reports → Past sales.')) return;
 
       if (clearOrders) {
-        // Archive current orders before clearing
         if (!state.archives) state.archives = [];
         if (state.orders && state.orders.length) {
           const active = state.orders.filter(o => o.status !== 'cancelled');
@@ -1965,29 +1964,45 @@
             grandTotal: total,
             orders: JSON.parse(JSON.stringify(state.orders))
           });
-          // Keep last 24 archives
           if (state.archives.length > 24) state.archives = state.archives.slice(0, 24);
         }
         state.orders = [];
       }
       if (resetStock) {
-        const defaults = {
-          ent1: 29, ent2: 18, ent3: 15, ent4: 20, ent5: 12,
-          sal1: 3, des1: 12, des2: 6, des3: 12
-        };
+        // Restock every item: use saved restockQty, else keep a sensible default
         state.menu.forEach(item => {
-          if (defaults[item.id] !== undefined) item.stock = defaults[item.id];
-          else item.stock = 20;
+          if (item.restockQty != null && item.restockQty !== '') {
+            item.stock = Number(item.restockQty) || 0;
+          } else if (item.defaultStock != null) {
+            item.stock = Number(item.defaultStock) || 0;
+          } else {
+            // First time: use current stock as the restock level, then restore it
+            // (if already sold down, staff should set restock in Menu)
+            const n = Number(item.stock);
+            item.restockQty = (n > 0 ? n : 20);
+            item.stock = item.restockQty;
+          }
         });
       }
       saveState();
       if (typeof renderAdminStats === 'function') renderAdminStats();
+      const tab = window._currentAdminTab || 'settings';
+      if (typeof switchAdminTab === 'function') switchAdminTab(tab);
       const msg = document.getElementById('reset-month-msg');
       if (msg) {
         msg.classList.remove('hidden');
-        setTimeout(() => msg.classList.add('hidden'), 3000);
+        setTimeout(() => msg.classList.add('hidden'), 4000);
       }
-      alert('New month started. All devices will update shortly.');
+      alert('Reset done.\n\n' + (resetStock ? 'Stock restored for ' + state.menu.length + ' menu item(s).\n' : '') + (clearOrders ? 'Orders archived and cleared.\n' : '') + '\nRefresh Menu tab to see quantities.');
+    }
+
+    function saveCurrentStockAsRestock() {
+      if (!confirm('Save current stock numbers as the default restock amounts for next month?')) return;
+      state.menu.forEach(item => {
+        item.restockQty = Number(item.stock) || 0;
+      });
+      saveState();
+      alert('Saved. Next "Start new month" with stock checked will restore these amounts.');
     }
 
     function saveAdminSettings() {
