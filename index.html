@@ -390,10 +390,10 @@
       });
     }
 
-    function saveState() {
+    function saveState(force) {
       const payload = {
         menu: state.menu,
-        orders: state.orders,
+        orders: state.orders || [],
         settings: state.settings,
         archives: state.archives || []
       };
@@ -401,9 +401,12 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       } catch (e) {}
       if (typeof db === 'undefined') return;
-      if (_skipNextFirebaseWrite) return;
-      db.ref('app').set(payload).catch(function(err) {
+      if (_skipNextFirebaseWrite && !force) return;
+      db.ref('app').set(payload).then(function() {
+        if (force) console.log('Firebase force-save ok', (payload.orders || []).length, 'orders');
+      }).catch(function(err) {
         console.warn('Firebase save error', err);
+        if (force) alert('Could not save to cloud. Check internet / Firebase rules.\n' + (err && err.message ? err.message : ''));
       });
     }
 
@@ -1938,6 +1941,30 @@
       `;
     }
 
+    function clearAllOrdersNow() {
+      if (!confirm('Clear ALL current orders and pickup list?\n\nThey will be archived under Reports → Past sales first.')) return;
+      if (!state.archives) state.archives = [];
+      if (state.orders && state.orders.length) {
+        const active = state.orders.filter(o => o.status !== 'cancelled');
+        state.archives.unshift({
+          id: 'arch-' + Date.now().toString(36),
+          saleDateLabel: state.settings.saleDateLabel || 'Sale',
+          saleDateISO: state.settings.saleDateISO || '',
+          closedAt: new Date().toISOString(),
+          orderCount: active.length,
+          grandTotal: active.reduce((s,o) => s + (o.total||0), 0),
+          orders: JSON.parse(JSON.stringify(state.orders))
+        });
+        if (state.archives.length > 24) state.archives = state.archives.slice(0, 24);
+      }
+      state.orders = [];
+      _skipNextFirebaseWrite = false;
+      saveState(true);
+      try { if (typeof db !== 'undefined') db.ref('app/orders').set([]); } catch (e) {}
+      if (typeof switchAdminTab === 'function') switchAdminTab('orders');
+      alert('Orders cleared. Orders and Pickup should be empty. If not, hard-refresh the page.');
+    }
+
     function resetForNewMonth() {
       const clearOrders = document.getElementById('reset-clear-orders')?.checked;
       const resetStock = document.getElementById('reset-stock')?.checked;
@@ -1984,16 +2011,29 @@
           }
         });
       }
-      saveState();
+      // Force cloud write so other devices and this page stay cleared
+      _skipNextFirebaseWrite = false;
+      saveState(true);
+      // Explicitly clear orders node too (helps if full set was blocked)
+      try {
+        if (typeof db !== 'undefined' && clearOrders) {
+          db.ref('app/orders').set([]);
+        }
+      } catch (e) {}
       if (typeof renderAdminStats === 'function') renderAdminStats();
-      const tab = window._currentAdminTab || 'settings';
-      if (typeof switchAdminTab === 'function') switchAdminTab(tab);
+      // Show Orders tab so you can verify the list is empty
+      if (clearOrders && typeof switchAdminTab === 'function') {
+        switchAdminTab('orders');
+      } else if (typeof switchAdminTab === 'function') {
+        switchAdminTab(window._currentAdminTab || 'settings');
+      }
       const msg = document.getElementById('reset-month-msg');
       if (msg) {
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 4000);
       }
-      alert('Reset done.\n\n' + (resetStock ? 'Stock restored for ' + state.menu.length + ' menu item(s).\n' : '') + (clearOrders ? 'Orders archived and cleared.\n' : '') + '\nRefresh Menu tab to see quantities.');
+      const left = (state.orders || []).length;
+      alert('Reset done.\n\nOrders now on this device: ' + left + (clearOrders ? ' (should be 0)' : '') + '\n' + (resetStock ? 'Stock restocked for ' + state.menu.length + ' item(s).\n' : '') + '\nIf orders come back, another device may be re-saving — open Admin only on one phone while resetting.');
     }
 
     function saveCurrentStockAsRestock() {
