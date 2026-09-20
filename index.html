@@ -308,11 +308,20 @@
 
     let _firebaseReady = false;
     let _skipNextFirebaseWrite = false;
+    let _ignoreFirebaseUntil = 0;
 
     function applyPayload(p) {
       if (!p) return;
       if (p.menu && Array.isArray(p.menu)) state.menu = p.menu;
-      if (p.orders && Array.isArray(p.orders)) state.orders = p.orders;
+      // After a local clear/reset, ignore remote order lists for a few seconds
+      // so an old cached write cannot bring orders back
+      if (p.orders && Array.isArray(p.orders)) {
+        if (Date.now() < _ignoreFirebaseUntil && p.orders.length > 0 && (state.orders || []).length === 0) {
+          console.log('Ignoring remote orders restore after local clear');
+        } else {
+          state.orders = p.orders;
+        }
+      }
       if (p.archives && Array.isArray(p.archives)) state.archives = p.archives;
       if (p.settings && typeof p.settings === 'object') {
         state.settings = { ...state.settings, ...p.settings };
@@ -1959,10 +1968,25 @@
       }
       state.orders = [];
       _skipNextFirebaseWrite = false;
+      _ignoreFirebaseUntil = Date.now() + 15000; // 15s block remote restore
       saveState(true);
-      try { if (typeof db !== 'undefined') db.ref('app/orders').set([]); } catch (e) {}
+      try {
+        if (typeof db !== 'undefined') {
+          db.ref('app/orders').set([]).then(function() {
+            return db.ref('app').update({ orders: [] });
+          }).then(function() {
+            alert('Cloud cleared. Orders and Pickup should show 0.\n\nIf not, open Firebase and delete app/orders, then reload.');
+          }).catch(function(err) {
+            alert('Local cleared but cloud save failed: ' + (err && err.message ? err.message : err) + '\n\nClear app/orders in Firebase Console.');
+          });
+        } else {
+          alert('Orders cleared on this device only (no Firebase).');
+        }
+      } catch (e) {
+        alert('Orders cleared locally. Check Firebase if they return.');
+      }
+      if (typeof renderAdminStats === 'function') renderAdminStats();
       if (typeof switchAdminTab === 'function') switchAdminTab('orders');
-      alert('Orders cleared. Orders and Pickup should be empty. If not, hard-refresh the page.');
     }
 
     function resetForNewMonth() {
@@ -2013,6 +2037,7 @@
       }
       // Force cloud write so other devices and this page stay cleared
       _skipNextFirebaseWrite = false;
+      if (clearOrders) _ignoreFirebaseUntil = Date.now() + 15000;
       saveState(true);
       // Explicitly clear orders node too (helps if full set was blocked)
       try {
