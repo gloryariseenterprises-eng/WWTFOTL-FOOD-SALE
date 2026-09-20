@@ -146,11 +146,8 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-stone-700 mb-2">Payment Method</label>
-                <div class="grid grid-cols-2 gap-2">
-                  <label class="cursor-pointer"><input type="radio" name="payment" value="square" class="peer sr-only" checked><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Square</div></label>
-                  <label class="cursor-pointer"><input type="radio" name="payment" value="cashapp" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash App</div></label>
-                  <label class="cursor-pointer"><input type="radio" name="payment" value="zelle" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Zelle</div></label>
-                  <label class="cursor-pointer"><input type="radio" name="payment" value="cash" class="peer sr-only"><div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">Cash</div></label>
+                <div id="payment-methods" class="grid grid-cols-2 gap-2">
+                  <!-- filled by renderPaymentMethods() -->
                 </div>
               </div>
               <div id="payment-details" class="bg-stone-50 rounded-lg p-3 text-sm hidden"></div>
@@ -278,7 +275,8 @@
         saleDateISO: '2026-09-13',
         preorderEnabled: true,
         cashAppTag: '$Boardma',
-        zelleInfo: 'Send to the ministry Zelle (ask staff for details)',
+        zelleInfo: 'Eucharia Ohanyerenwa — use Zelle to this name. Include your order name in the memo.',
+        squareEnabled: false,
         squarePaymentLink: '',
         squareInstructions: 'Pay with Square using the link or in-person reader. Include your order name in the note.',
         readySmsTemplate: 'Hi {name}! Your WWFL order {id} is READY for pickup. Total ${total}. See you soon! – Women With The Fear Of The Lord',
@@ -336,6 +334,7 @@
     function refreshUIFromState() {
       try {
         if (typeof applyPublicSettings === 'function') applyPublicSettings();
+        if (typeof renderPaymentMethods === 'function') renderPaymentMethods();
         if (typeof renderMenu === 'function') renderMenu();
         if (typeof renderCart === 'function') renderCart();
         const adminView = document.getElementById('admin-view');
@@ -603,6 +602,28 @@
       document.getElementById('place-order-btn').disabled = false;
     }
 
+    function renderPaymentMethods() {
+      const wrap = document.getElementById('payment-methods');
+      if (!wrap) return;
+      const squareOn = !!(state.settings.squareEnabled && state.settings.squarePaymentLink);
+      const opts = [];
+      if (squareOn) {
+        opts.push({ v: 'square', label: 'Square' });
+      }
+      opts.push({ v: 'cashapp', label: 'Cash App' });
+      opts.push({ v: 'zelle', label: 'Zelle' });
+      opts.push({ v: 'cash', label: 'Cash' });
+      const current = document.querySelector('input[name="payment"]:checked')?.value;
+      let pick = current;
+      if (!pick || (pick === 'square' && !squareOn)) pick = 'cashapp';
+      wrap.innerHTML = opts.map(o => `
+        <label class="cursor-pointer">
+          <input type="radio" name="payment" value="${o.v}" class="peer sr-only" ${o.v === pick ? 'checked' : ''} onchange="updatePaymentDetails()">
+          <div class="border border-stone-200 peer-checked:border-teal-700 peer-checked:bg-teal-50 rounded-lg py-2.5 text-center text-sm font-medium">${o.label}</div>
+        </label>`).join('');
+      updatePaymentDetails();
+    }
+
     function updatePaymentDetails() {
       const method = document.querySelector('input[name="payment"]:checked')?.value;
       const box = document.getElementById('payment-details');
@@ -614,14 +635,28 @@
         box.innerHTML = `
           <p class="font-medium text-stone-700 mb-1">Pay with Square</p>
           <p class="text-sm text-stone-600 mb-2">${instr}</p>
-          ${link ? `<a href="${link}" target="_blank" rel="noopener" class="inline-block bg-[#006AFF] hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Open Square Payment →</a>` : `<p class="text-xs text-amber-700">Staff: add your Square Payment Link in Admin → Settings</p>`}
+          ${link ? `<a href="${link}" target="_blank" rel="noopener" class="inline-block bg-[#006AFF] hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Open Square Payment →</a>` : `<p class="text-xs text-amber-700">Square is not set up yet.</p>`}
           <p class="text-xs text-stone-500 mt-2">Order stays Pending until payment is confirmed.</p>`;
       } else if (method === 'cashapp') {
         box.classList.remove('hidden');
-        box.innerHTML = `<p class="font-medium text-stone-700">Send to Cash App</p><p class="text-teal-800 font-semibold text-lg">${state.settings.cashAppTag}</p><p class="text-xs text-stone-500 mt-0.5">Include your name. Order stays Pending until confirmed.</p>`;
+        const tag = state.settings.cashAppTag || '$Boardma';
+        box.innerHTML = `
+          <p class="font-medium text-stone-700">Pay with Cash App</p>
+          <p class="text-teal-800 font-bold text-xl my-1">${tag}</p>
+          <p class="text-sm text-stone-600">Open Cash App → scan or search <strong>${tag}</strong> → send the order total.</p>
+          <p class="text-xs text-stone-500 mt-1">In the note, put your <strong>name</strong> and order. Order stays <strong>Pending</strong> until staff confirms payment.</p>
+          <img src="marketing/cashapp-qr.png" alt="Cash App QR" class="mt-2 mx-auto w-40 h-40 object-contain rounded-lg border border-stone-200 bg-white" onerror="this.style.display='none'">`;
       } else if (method === 'zelle') {
         box.classList.remove('hidden');
-        box.innerHTML = `<p class="font-medium text-stone-700">Zelle</p><p class="text-sm text-stone-600">${state.settings.zelleInfo}</p>`;
+        const info = state.settings.zelleInfo || 'Eucharia Ohanyerenwa';
+        box.innerHTML = `
+          <p class="font-medium text-stone-700">Pay with Zelle</p>
+          <p class="text-sm text-stone-700 mt-1">${info}</p>
+          <p class="text-xs text-stone-500 mt-1">Send the order total. In the memo, put your <strong>name</strong>. Order stays <strong>Pending</strong> until staff confirms.</p>
+          <img src="marketing/zelle-qr.png" alt="Zelle QR" class="mt-2 mx-auto w-40 h-40 object-contain rounded-lg border border-stone-200 bg-white" onerror="this.style.display='none'">`;
+      } else if (method === 'cash') {
+        box.classList.remove('hidden');
+        box.innerHTML = `<p class="font-medium text-stone-700">Pay with cash</p><p class="text-sm text-stone-600">Pay at pickup / walk-up. Order stays Pending until staff marks Paid.</p>`;
       } else {
         box.classList.add('hidden');
       }
@@ -1869,6 +1904,11 @@
 
           <div class="border-t border-stone-100 pt-5">
             <p class="font-semibold text-stone-800 mb-3">Square payments</p>
+            <label class="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl border border-stone-200 bg-stone-50">
+              <span class="text-sm font-medium text-stone-800">Enable Square button</span>
+              <input type="checkbox" id="set-square-enabled" class="w-5 h-5" ${s.squareEnabled && s.squarePaymentLink ? 'checked' : ''}>
+            </label>
+            <p class="text-xs text-stone-500 mb-2">Leave off until you paste a Square Payment Link below.</p>
             <div class="mb-3">
               <label class="block text-sm font-medium text-stone-700 mb-1">Square Payment Link</label>
               <input type="url" id="set-square-link" value="${(s.squarePaymentLink || '').replace(/"/g, '&quot;')}"
@@ -2078,6 +2118,7 @@
       const zelle = document.getElementById('set-zelle')?.value?.trim() || state.settings.zelleInfo;
       const squareLink = document.getElementById('set-square-link')?.value?.trim() || '';
       const squareInstr = document.getElementById('set-square-instr')?.value?.trim() || state.settings.squareInstructions;
+      const squareEnabled = document.getElementById('set-square-enabled')?.checked ?? false;
       const notifyEmail = document.getElementById('set-notify-email')?.value?.trim() || '';
       const emailjsKey = document.getElementById('set-emailjs-key')?.value?.trim() || '';
       const emailjsService = document.getElementById('set-emailjs-service')?.value?.trim() || '';
@@ -2090,6 +2131,7 @@
       state.settings.cashAppTag = cashapp;
       state.settings.zelleInfo = zelle;
       state.settings.squarePaymentLink = squareLink;
+      state.settings.squareEnabled = !!(squareEnabled && squareLink);
       state.settings.squareInstructions = squareInstr;
       state.settings.notifyEmail = notifyEmail;
       state.settings.emailjsPublicKey = emailjsKey;
@@ -2262,6 +2304,9 @@
       loadState();
       // Ensure new settings keys exist for older saved data
       if (state.settings.preorderEnabled === undefined) state.settings.preorderEnabled = true;
+      if (state.settings.squareEnabled === undefined) state.settings.squareEnabled = false;
+      if (!state.settings.cashAppTag) state.settings.cashAppTag = '$Boardma';
+      if (!state.settings.zelleInfo || state.settings.zelleInfo.indexOf('ask staff') >= 0) state.settings.zelleInfo = 'Eucharia Ohanyerenwa — use Zelle to this name. Include your order name in the memo.';
       if (!state.settings.saleDateISO) state.settings.saleDateISO = '2026-09-13';
       applyPublicSettings();
       // Bookmarkable admin: #admin restores session or asks for password
@@ -2272,8 +2317,9 @@
         dateInp.value = tomorrow.toISOString().slice(0,10);
         dateInp.min = new Date().toISOString().slice(0,10);
       }
-      renderMenu(); renderCart(); updatePaymentDetails();
-      document.querySelectorAll('input[name="payment"]').forEach(r => r.addEventListener('change', updatePaymentDetails));
+      renderMenu(); renderCart();
+      if (typeof renderPaymentMethods === 'function') renderPaymentMethods();
+      else updatePaymentDetails();
     });
 
     function applyPublicSettings() {
